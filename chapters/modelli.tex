@@ -1,0 +1,186 @@
+% !TeX spellcheck = it_IT
+\section{Modelli per sistemi paralleli}
+Un \textbf{modello di programmazione parallela} rappresenta un'\textbf{astrazione} per un sistema di calcolo parallelo in cui è conveniente esprimere algoritmi concorrenti/paralleli. \\
+
+Si possono avere diversi livelli di astrazione: 
+\begin{itemize}
+	\item \textbf{Modello macchina}: livello più basso che descrive l'hardware e il sistema operativo (registri, memoria, I/O); il linguaggio assembly è basato su questo livello di astrazione
+	\item \textbf{Modello architetturale}: rete di interconnessione di piattaforme parallele, organizzazione della memoria e livelli di sincronizzazione tra processi, modalità di esecuzione delle istruzioni di tipo SIMD o MIMD
+	\item Modello computazionale: modello formale di macchina che fornisce metodi analitici per fare predizioni teoriche sulle prestazioni (in base a tempo, uso delle risorse, …). Per esempio il modello RAM descrive il comportamento del modello architetturale di Von Neumann (processore, memoria, operazioni, …) Il modello PRAM estende RAM per architetture parallele
+\end{itemize}
+
+\subsection{Modello PRAM}
+Si tratta del più semplice modello di calcolo parallelo: \textbf{memoria condivisa}, $n$ processori, la memoria permette scambiare facilmente valori tra i processori.\\
+
+Il calcolo procede per passi: ad ogni passo ogni processore può fare una operazione sui dati con possesso esclusivo; può leggere o scrivere nella memoria condivisa. Si può selezionare un insieme di processori che eseguono tutti la stessa istruzione (su dati generalmente diversi - \textbf{SIMD}). Gli altri processori restano inattivi; i processori attivi sono sincronizzati (eseguono la stessa istruzione simultaneamente).\\
+
+\paragraph{SIMD:} I modelli SIMD sono basati su unità funzionali contenute in processori general purpose. Le ALU SIMD possono effettuare operazioni multiple simultaneamente in un ciclo di clock. Usano registri che effettuano \texttt{load} e \texttt{store} di molteplici elementi di dati in una sola transizione. La popolarità SIMD deriva dall'uso esplicito di linguaggi di programmazione parallela sfruttando il parallelismo dei dati.\\
+Permette di semplificare il controllo in quanto univoco.\\
+
+\paragraph{Modello di programmazione parallela:} Specifica la "vista" del programmatore del computer parallelo, definendo come si possa codificare un algoritmo
+\begin{itemize}
+	\item Comprende la \textbf{semantica} del linguaggio di programmazione, librerie, compilatore, tool di profiling
+	\item Dice di che \textbf{tipo} sono le c\textbf{omputazioni parallele} (instruction level, procedural level o parallel loops)
+	\item Permette di dare \textbf{specifiche implicite} o \textbf{esplicite} (da parte utente) per il parallelismo
+	\item Modalità di \textbf{comunicazione tra unità di computazione} per lo scambio di informazioni (shared variable)
+	\item Meccanismi di \textbf{sincronizzazione} per gestire computazioni e comunicazioni tra diverse unità che operano in parallelo
+	\item Molti forniscono il concetto di \textbf{parallel loop} (iterazioni indipendenti), altri di \textbf{parallel task} (moduli assegnati a processori distinti eseguiti in parallelo)
+	\item Un \textbf{programma parallelo} è eseguito da processori in un ambiente parallelo tale che in ogni processore si ha uno o più flussi di esecuzione, quest'ultimi sono detti processi o thread
+	\item Ha una \textbf{organizzazione dello spazio di indirizzamento}: per esempio, distribuito (no variabili shared quindi uso del message passing) o condiviso (uso di variabili shared per lo scambio di informazioni
+\end{itemize}
+
+%s8 controlla, boh cazzo ne so
+
+\subsection{Processi UNIX}
+Con "processo" si definisce un programma in esecuzione con diverse risorse allocate (stack, heap, registri, \dots). Un processo con un solo thread può eseguire una sola attività alla volta, se ci sono più processi in esecuzione è necessario alternali e di conseguenza avere un context switch (costoso, gestito dal sistema operativo). I processi possono essere creati a runtime.\\
+
+\paragraph{Thread Unix:} Un thread (su CPU) è una estensione del modello di processo (lightweight process perché possiedono un contesto più snello rispetto ai processi). Si tratta di un flusso di istruzioni di un programma e viene schedulato come unità indipendente nelle code di esecuzione dei processi della CPU (scheduler).\\
+Condivide lo spazio di indirizzamento con gli altri thread del processo: rappresentato da un thread control block (TCB) che punta al PCB del processo contenitore. Dal punto di vista del programmatore, l’esecuzione del thread è sequenziale, quindi un'istruzione eseguita alla volta, con un puntatore alla prossima istruzione da eseguire e verificando costantemente l’accesso ai dati.\\
+Vi sono meccanismi di sincronizzazione tra thread per evitare race conditon (accesso a variabili condivise o in generale comportamenti non deterministici).\\
+
+Ogni processo ha il proprio contesto ed è pensato per eseguire codice sequenzialmente; l'astrazione dei thread vuole consentire di eseguire procedure concorrentemente. Ciascuna procedura eseguita in parallelo sarà un thread.\\
+Un thread è quindi un singolo flusso di istruzioni, con le strutture dati necessarie per realizzare il proprio flusso di controllo. Una procedura che lavora in parallelo con le altre.\\
+
+\paragraph{Stati di un thread:} Gli stati di un thread possono essere:
+\begin{itemize}
+	\item \textbf{Newly generated}: il thread è stato generato e non ha ancora eseguito operazioni
+	\item \textbf{Executable}: il thread è pronto per l'esecuzione, ma al momento non è assegnato a nessuna unità di calcolo
+	\item Running: il thread è in esecuzione
+	\item Waiting: il thread è in attesa di un evento esterno (es. I/O) quindi non può andare in esecuzione fino a che l'evento non si verifica
+	\item Finished: il thread ha terminato tutte le operazioni
+\end{itemize}
+
+\newpage
+
+\subsection{Thread in CUDA}
+Pensare in parallelo significa avere chiaro quali feature la GPU espone al programmatore
+\begin{itemize}
+	\item Conoscere l'architettura della GPU per scalare su migliaia di thread come fosse uno
+	\item gestione basso livello cache permette di sfruttare principio di località
+	\item Conoscere lo scheduling di blocchi di thread e la gerarchia di thread e di memoria (ridurre latenze)
+	\item Fare impiego diretto della shared memory (riduce latenze come le cache)
+	\item Gestire direttamente le sincronizzazioni (barriere tra thread)
+\end{itemize}
+
+Si scrive codice in CUDA C (estensione di C) per l'esecuzione sequenziale e lo si estende a migliaia di thread (permette di pensare "ancora" in sequenziale).\\
+
+L'host ha una serie di processi in esecuzione e controlla tutto, lancio delle funzioni kernel sul device compreso. Con "kernel" si intende programma sequenziale eseguito dalla GPU.\\
+Ogni kernel è asincrono, la CPU lancia il kernel e passa a dopo, almeno finché non è necessaria la sincronizzazione, come ad esempio per i trasferimenti tra memorie.\\
+
+Il compilatore \texttt{nvcc} genera codice eseguibile per host e device (fat-binary).\\
+%s17 check
+
+Esempio di \textbf{processing flow}: 
+\begin{itemize}
+	\item Copiare dati da CPU a GPU, tutto parte dalla CPU
+	\item Caricare il programma GPU, con tutto il setup necessario, svolto da parte della GPU
+	\item Al termine della computazione i risultati vengono copiati da GPU a CPU
+\end{itemize}
+
+\newpage
+
+La "ricetta" base per cucinare in CUDA:
+\begin{enumerate}
+	\item Setup dei dati su host (CPU-accessible memory)
+	\item Alloca memoria per i dati sulla GPU
+	\item Copia i dati da host a GPU
+	\item Alloca memoria per output su host
+	\item Alloca memoria per output su GPU
+	\item Lancia il kernel su GPU
+	\item Copia output da GPU a host
+	\item Libera le memorie
+\end{enumerate}
+
+\subsubsection{Organizzazione dei thread}
+CUDA presenta una \textbf{gerarchia astratta di thread} strutturata su \textbf{due livelli} che si decompone in 
+\begin{itemize}
+	\item grid: una griglia ordinata di blocchi
+	\item block: una collezione ordinata di thread
+\end{itemize}
+Grid e block possono essere 1D, 2D o 3D. 9 combinazioni ma di solito si usa la stessa per grid e block. La scelta delle dimensioni è da definire a seconda della struttura dei dati in uso.
+\begin{center}
+	\includegraphics[width=0.98\linewidth]{img/modelli/grdiblock}
+\end{center}
+
+Tutti i blocchi devono essere uguali, in struttura e numero di thread. La griglia replica blocchi tutti uguali, ogni blocco ha thread uguali.
+
+In qualsiasi caso, in \textbf{ogni blocco} ci possono essere \textbf{al più 1024 thread}; esempi di dimensioni: $(1024, 1, 1)$  o $(32, 16, 2)$, il totale non può superare 1024.\\
+
+\paragraph{Thread block:} Un blocco di thread è un gruppo di thread che possono cooperare tra loro mediante:
+\begin{itemize}
+	\item Block-local synchronization
+	\item Block-local shared memory
+\end{itemize}
+
+La memoria più veloce è condivisa solo dallo stesso blocco, quindi da CUDA 9.0 e CC 3.0+ thread di differenti blocchi possono cooperare come Cooperative Groups.\\
+
+Tutti i thread in una grid condividono lo stesso spazio di global memory. Una grid rappresenta un processo, ogni processo lanciato dall'host ha una sua grid associata.\\
+
+I thread vengono identificati univocamente dalle coordinate: 
+\begin{itemize}
+	\item \texttt{blockId} (indice del blocco nella grid)
+	\item \texttt{threadId} (indice di thread nel blocco)
+\end{itemize}
+Sono variabili built-in, ognuna delle quali con 3 campi: \texttt{x,y,z}.\\
+
+Dimensioni di blocchi e thread: le dimensioni di grid e block sono specificate dalle variabili built-in: 
+\begin{itemize}
+	\item \texttt{blockDim} (dimensione di blocco, misurata in thread)
+	\item \texttt{gridDim} (dimensione della griglia, misurata in blocchi)
+\end{itemize}
+Sono di tipo \texttt{dim3}, un vettore di interi basato su \texttt{uint3}. I campi sono sempre \texttt{x,y,z}. Ogni componente non specificata è inizializzata a 1.\\
+
+\paragraph{Linearizzare gli indici:} Ovviamente gli indici in blocchi a più dimensioni si possono linearizzare: con due indici $x,y$ posso unificarli facendo $x + y \cdot D_x$, dove $D_x$ è la dimensione della riga.\\
+Possiamo tradurlo in un indice unico per i thread: per griglie e blocchi a 1D ciascuno: 
+\begin{center}
+	\texttt{IDth = blockIdx.x * blockDim.x + threadIdx.x}
+\end{center}
+Si può scalare a più dimensioni.\\
+
+\paragraph{Lanciare un kernel:} Per lanciare un kernel CUDA si aggiungono tra triple parentesi angolari le dimensioni di grid e block.
+\begin{center}
+	\texttt{kernel\_name <<<grid, block>>>(argument list);}
+\end{center}
+
+\paragraph{Runtime API:} Alcune funzioni:
+\begin{itemize}
+	\item \texttt{cudaDeviceReset()} distrugge tutte le risorse associate al device per il processo corrente, non molto usato ma si può fare
+	\item \texttt{cudaDeviceSynchronize()} aspetta che la GPU termini l'esecuzione di tutti i task lanciati fino a quel punto, sincronizzazione host device
+\end{itemize}
+Per effettuare debugging, la \texttt{Synchronize} permette di "scaricare" tutti i \texttt{printf} quando servono. Altrimenti, dato che le chiamate sono asincrone, si rischia che l'applicazione lato CPU termini prima che i \texttt{printf} abbiano avuto modo di essere mostrati. \\
+
+Un altro mezzo di debugging è \texttt{Kernel<<<1,1>>>}: forza l'esecuzione su un solo blocco e thread, emulando comportamento sequenziale sul singolo dato.\\
+
+Proprietà dei kernel: 
+\begin{center}
+	\begin{tabular}{| l | l | p{4cm} |}
+		\hline
+		\textbf{QUALIFICATORI} & \textbf{ESECUZIONE} & \textbf{CHIAMATA} \\
+		\hline
+		\texttt{\_\_global\_\_} & Eseguito dal device & Dall’host e dalla compute cap. 3 anche dal device \\
+		\hline
+		\texttt{\_\_device\_\_} & Eseguito dal device & Solo dal device \\
+		\hline
+		\texttt{\_\_host\_\_} & Eseguito dall’host & Solo dall’host \\
+		\hline
+	\end{tabular}
+\end{center}
+
+\paragraph{Restrizioni del kernel: }
+\begin{itemize}
+	\item Accede alla sola memoria device
+	\item Deve restituire un tipo \texttt{void}
+	\item Non supporta il numero variabile di argomenti
+	\item Non supporta variabili statiche
+	\item Non supporta puntatori a funzioni
+	\item Esibisce un comportamento asincrono rispetto all'host
+\end{itemize}
+
+\paragraph{Gestione degli errori:} Si ha un \texttt{enum cudaError\_t} come valore di ritorno di ogni chiamata cuda. Può essere \texttt{success} o \texttt{cudaErrorMemoryAllocation}. Si può usare {cudaError\_t cudaGetLastError(void)} per ottenere il codice dell'ultimo errore.\\
+
+%boh
+
+%Misurare il tempo con la CPU
+%smth smth
+
+%Idk, I guess L2 is over, some lab in it
