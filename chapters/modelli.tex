@@ -184,3 +184,98 @@ Proprietà dei kernel:
 %smth smth
 
 %Idk, I guess L2 is over, some lab in it
+
+\newpage
+
+\subsection{Warp}
+
+\textbf{Ogni thread} vede: 
+\begin{itemize}
+	\item i suoi \textbf{registri privati}
+	\item la \textbf{memoria condivisa} del blocco di thread
+\end{itemize}
+%Prime slide
+
+Single Instruction Multiple Thread; l'architettura è basata sul \textbf{warp}, (tradotto in "trama" nella tessitura), l'idea è che ci sono delle file di thread (warp), collegate assieme dall'ordito. Rappresenta i blocchi di thread, sono blocchi da 32. Ogni Streaming Mutiprocessor SM esegue i thread in gruppi di 32, chiamati warp. Idealmente, tutti i thread in un warp eseguono la stessa cosa in parallelo allo stesso tempo (SIMD all'interno del warp).\\
+
+Ogni thread ha il suo program counter e register state e può seguire cammini distinti di esecuzione delle istruzioni (parallelismo a livello thread, da Volta in poi, prima c'era un PC solo per ogni warp).\\
+
+Il valore 32 è l'unità minima di esecuzione che permette grande efficienza nell'uso della GPU, concettualmente i blocchi di 32 dovrebbero avere modello SIMD, anche se nella pratica è SIMT (più flessibile ma potenzialmente meno efficiente). Dove si può si deve \textbf{evitare la divergenza di esecuzione} all'interno del warp. I \textbf{blocchi} vengono \textbf{divisi in warp}, quindi è meglio avere blocchi con thread multipli di 32, per evitare divergenza.\\
+
+I blocchi di thread possono essere configurati logicamente in 1,2 o 3 dimensioni, ma a livello hardware sarà una sola dimensione con id progressivo, con un warp ogni 32 thread.\\
+
+Sarà quindi necessario uno scheduling per i warp (il numero di blocchi richiesto è maggiore, chi va prima in esecuzione?) all'interno dei blocchi, vengono mandati in esecuzione quando sono liberi. Ad ogni colpo di clock lo scheduler dei warp decide quale mandare in esecuzione tra quelli che 
+\begin{itemize}
+	\item non sono in attesa di dati dalla device memory (alta latenza, memory latency)
+	\item non stanno completando un'istruzione precedente (pipeline delay)
+\end{itemize}
+Questi dettagli sono trasparenti al programmatore, serve solo a garantire un elevato numero di warp in esecuzione; vogliamo massimizzare l'occupancy (percentuale di risorse usate in ogni SM) .\\
+
+Se all'interno di un warp dei thread devono eseguire istruzioni diverse (e.g., per un \texttt{if}), la GPU le eseguirà sequenzialmente al posto che in parallelo, disabilitando i thread inattivi. Questa è una \textbf{divergenza} e riduce l'efficienza, a volte anche significativamente.  \\
+
+Ogni warp ha un contesto di esecuzione (runtime), trasparente al programmatore, che consta di: 
+\begin{itemize}
+	\item Program counters
+	\item Registri a 32-bit ripartiti tra thread
+	\item Shared memory ripartita tra blocchi
+\end{itemize} 
+
+Di conseguenza, la memoria locale ad ogni thread è limitata, bisogna prestare attenzione alle risorse richieste simultaneamente per ogni thread, altrimenti il numero di thread che possono essere attivi in maniera concorrente si riduce.\\
+
+I registri sono usati per le variabili locali automatiche scalari (che non sono array quindi) e le coordinate dei thread. I dati nei registri sono privati ai thread (scope) e ogni multiprocessor ha un insieme di 32-bit register che sono partizionati tra i warp.\\
+
+%S17 scrivi
+% Ma controlla un po' tutto tbh
+
+Il numero di blocchi e warp che possono essere elaborati insieme su un SM per un dato kernel dipende
+\begin{itemize}
+	\item dalla quantità di registri e di shared memory usata dal kernel
+	\item dalla quantità di registri e shared memory resi disponibili dallo SM
+\end{itemize}
+Ogni architettura ha i suoi vincoli e noi vogliamo avvicinarci il più possibile ai limiti massimi, in modo da rendere il più efficiente possibile il programma. C'è un numero massimo di thread/blocchi/warp per multiprocessor, vogliamo fare in modo di avere l'utilizzo maggiore possibile.\\
+
+\newpage
+
+%Latency hiding
+\paragraph{Latency Hiding:} La "latenza"  è il numero di cicli necessari al completamento di un'istruzione. Per massimizzare il throughput occorre che lo scheduler abbia sempre warp eleggibili ad ogni ciclo di clock. Si ha così latency hiding intercambiando la computazione tra warp.\\
+Tipi di istruzioni che inducono latenza: 
+\begin{itemize}
+	\item Istruzioni aritmetiche: tempo necessario per la terminazione dell'operazione (\texttt{add}, \texttt{mult}, \dots); 10-20 cicli di clock
+	\item Istruzioni di memoria: tempo necessario al dato per giungere a destinazione (\texttt{load}, \texttt{store}); 400-800 cicli di clock
+\end{itemize}
+La griglia viene suddivisa in blocchi, il blocco in thread, i blocchi vanno all'SM.
+\begin{center}
+	\includegraphics[width=0.85\linewidth]{img/modelli/modelandhwstruct}
+\end{center}
+
+%sincronizzazione smth up to s29
+
+\newpage
+
+\paragraph{Sincronizzazione a più livelli: } Le prestazioni decrescono con l'aumentare della divergenza nei warp. Primitive di sincronizzazione sono necessarie per evitare race conditions in cui diversi thread accedono simultaneamente alla stessa locazione di memoria. Si possono avere più livelli di sincronizzazione:
+\begin{itemize}
+	\item \textbf{System-level}: attesa che venga completato un dato task su entrambi host e device
+	\begin{center}
+		\texttt{cudaError\_t cudaDeviceSynchronize(void);}
+	\end{center}
+	Blocca l'applicazione host finché tutte le operazioni CUDA non sono completate;
+	
+	 \item \textbf{Block-level}: attesa che tutti i thread in un blocco raggiungano lo stesso punto di esecuzione
+	 \begin{center}
+	 	\texttt{\_\_device\_\_ void \_\_syncthreads(void);}
+	 \end{center}
+	 Sincronizza i thread all'interno di un blocco: attende fino a che tutti raggiungono il punto di sincronizzazione
+	 
+	 \item \textbf{Warp-level}: attesa che tutti i thread in un warp raggiungano lo stesso punto di esecuzione
+	 \begin{center}
+	 	\texttt{\_\_device\_\_ void \_\_syncwarp(mask);}
+	 \end{center}
+	 Sincronizza i thread all'interno di un warp: attende fino a che tutti raggiungono il punto di sincronizzazione (riconverge)
+\end{itemize}
+La sincronizzazione a livello di blocco va usata con attenzione, può anche portare a deadlock, un esempio semplice può essere una sincronizzazione dentro un \texttt{if-else}, potrebbero esserci thread che non entreranno mai nel ramo con la sincronizzazione, deadlock.\\
+
+Il compilatore ha tecniche di ottimizzazione per evitare divergenza all'interno del warp (es: per un if calcola entrambi i branch).\\
+
+%manca boh, cazzo ne so
+% Fino slide 37
+% Resto lab
