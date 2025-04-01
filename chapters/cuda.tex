@@ -232,6 +232,19 @@ Il compilatore ha tecniche di ottimizzazione per evitare divergenza all'interno 
 
 \newpage
 
+\subsection{Operazioni Atomiche}
+
+Per evitare race conditions, le \textbf{operazioni atomiche} in CUDA eseguono (solo) operazioni matematiche senza interruzione da altri thread. Si tratta di funzioni che vengono tradotte in istruzioni singole. \\
+
+Le operazioni basilari sono:
+\begin{itemize}
+	\item Matematiche: add, subtract, maximum, minimum, increment, and decrement
+	\item Bitwise: AND, bitwise OR, bitwise XOR
+	\item Swap: scambiano valore in memoria con uno nuovo
+\end{itemize}
+
+\newpage
+
 \subsection{Memoria CUDA}
 
 Per il programmatore esistono due tipi di memorie: 
@@ -324,6 +337,4 @@ Se la dimensione non è nota compile time, è possibile dichiarare una variabile
 	\texttt{kernel <<<grid, block, N*sizeof(int)>>>(\dots)}
 \end{center}
 
-%TODO completa slide 27-28
-
-
+%TODO completa slide 27-28? Maybe
