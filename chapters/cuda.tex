@@ -338,3 +338,125 @@ Se la dimensione non è nota compile time, è possibile dichiarare una variabile
 \end{center}
 
 %TODO completa slide 27-28? Maybe
+
+\newpage
+
+% Vedi tu come metterlo, mancano tutte le parti di "lab"
+\subsubsection{Prodotto Convolutivo con SMEM}
+La \href{https://it.wikipedia.org/wiki/Convoluzione}{\texttt{convoluzione}} sono una serie di somme e prodotti
+$$ y(n) = h(n) \cdot x(n) = \sum_{k=0}^{N-1} h(k) x(n-k) $$
+
+Si prende un segnale, si considera un kernel/finestra su tale segnale, si fanno i prodotti. Il tutto viene fatto un numero \textit{molto elevato} di volte. Si può scalare il processo a più dimensioni.\\
+
+Ci sono sempre problemi di bordo: cosa faccio quando la maschera considerata arriva al bordo dei dati? Andrebbe fuori, quindi devo popolare nel modo corretto i dati mancanti (\texttt{0}? Li invento?).\\
+
+\paragraph{Tiling:} Divido i dati in blocchi (ad esempio, 16 elementi in 4 blocchi da 4 thread), ogni thread nel blocco fa un prodotto della convoluzione. Per ridurre l'accesso alla global memory, in cache/memoria condivisa si tengono i dati a cui l'accesso è fatto più frequentemente, ovvero i valori del "blocco di dati" assegnato al block (tutti i thread devono calcolare sullo stesso insieme di dati, o quasi), tenendo conto della dimensione della maschera (serve avere i dati "adiacenti" al blocco (sarebbe molto utile un'immagine, si capirebbe subito)).\\
+
+I dati da caricare in smem sono più dei thread nel blocco ("alone" che va al di fuori del blocco di dati stesso); in smem carico tutti i possibili dati a cui il blocco deve fare l'accesso. Chi carica che dati in memoria? I dati esterni al blocco potrebbero essere anche più del blocco stesso (maschera "grossa"). La soluzione è dare un ordine ai thread e dividere il più equamente possibile i caricamenti in memoria tra i thread del blocco.\\
+
+% Come compito cosa Gaussiana
+
+\newpage
+
+%slide l5
+\subsection{Global Memory}
+
+Nei computer moderni esiste una gerarchia di memoria per minimizzare latenze e massimizzare throughput. In genere, si ha l'illusione virtuale di una grande memoria, tutta a bassa latenza, anche se la memoria con effettivamente bassa latenza è poca e si ha una memoria ad alta capacità e alta latenza.\\
+
+All'interno delle GPU abbiamo, dalla latenza più alta alla più bassa: 
+\begin{itemize}
+	\item Device Memory
+	\item L2 Cache
+	\item L1/shared
+	\item Registers
+\end{itemize}
+
+Le gerarchie di memorie, comprese quelle CUDA, fanno fede ai principi di: 
+\begin{itemize}
+	\item \textbf{Località spaziale}: se l'istruzione all'indirizzo $i$ viene eseguita, probabilmente dopo verrà eseguita quella all'indirizzo $i+\Delta i$
+	\item \textbf{Località temporale}: se un'istruzione viene eseguita al tempo $t$, probabilmente verrà eseguita anche al tempo $t + \Delta t$ (dove $\Delta t$ è piccolo)
+\end{itemize}
+
+\paragraph{Registers:} Le memorie più veloci in assoluto, con lifetime del kernel. Vengono ripartiti tra i warp attivi, le variabili dichiarate nel codice device senza qualificatori generalmente risiedono in un registro. Meno registri usa il kernel, più blocchi di thread è probabile che risiedano sul multiprocessore (il compilatore usa un'euristica per ottimizzare questo parametro). Register spilling: se si usano più registri dei consentiti le variabili si riversano nella local memory .\\
+
+\paragraph{Local Memory:} Si tratta di una memoria \textit{lenta} (collocata off-chip, alta latenza, bassa bandwidth). Si tratta di una memoria locale ai thread. Usata per contenere le variabili automatiche (grandi) non contenute nei registri, o per le variabili al di fuori causa spilling. La local memory risiede nella device memory, pertanto gli accessi hanno stessa latenza e ampiezza di banda della global memory e sono soggetti anche agli stessi vincoli di coalescenza, ma da CC 2.0 ci sono parti poste in cache L1 a livello di SM e in cache L2 a livello di device. Il compilatore \texttt{nvcc} si preoccupa della sua allocazione e non è controllata dal programmatore.\\
+
+\paragraph{Constant Memory:} Risiede nella device memory (64K per tutte le CC) ed ha una cache dedicata in ogni SM (8K). Definibile tramite l'attributo \texttt{\_\_constant\_\_}. Ospita dati in sola lettura, ideale per accessi uniformi. Ha scope globale, va dichiarata al di fuori di qualsiasi kernel e viene dichiarata staticamente, quindi è visibile a tutti i kernel nella stessa unità di compilazione.\\
+La constant memory può essere inizializzata dall'host usando:
+\begin{center}
+	\texttt{cudaError\_t cudaMemcpyToSymbol(const void* symbol, const void* src, size\_t count)}
+\end{center}
+
+Lavora bene quando tutti i thread di un warp leggono dallo stesso indirizzo di memoria (raggiunge l'efficienza dei registri); se i thread di un warp leggono da indirizzi diversi allora le letture vengono serializzate, riducendo l'efficienza.\\
+
+\paragraph{Texture Memory:} Risiede nella device memory e (può avere) una read-only cache per-SM ed è acceduta solo attraverso di essa. La cache include un supporto hardware efficiente per filtraggio o interpolazione floating-point nel processo di lettura dei dati. Ottimizzata per la località spaziale 2D, quindi dati espressi sotto forma di matrici. I thread in un warp che usano la texture memory per accedere a dati 2D hanno hanno migliori prestazioni rispetto a quelle standard, quindi è adatta per applicazioni in cui servono classiche elaborazioni di immagini/video. Per altre applicazioni l’uso della texture memory potrebbe essere più lento della global memory.\\
+
+\paragraph{Global Memory:} La più grande, con più alta latenza e più comunemente usata memoria su GPU. Ha scope e lifetime globale (da qui il nome). Dichiarazione (codice host):
+\begin{center}
+	\begin{tabular}{r | l r | }
+		\cline{2-3}
+		\textbf{Statica} & \texttt{\_\_device\_\_ int a[N];} & \\
+		\textbf{Dinamica} & \texttt{cudaMalloc((void **)\&d\_a, N);} & \texttt{cudaFree(d\_a);} \\
+		\cline{2-3}
+	\end{tabular}
+\end{center}
+
+Corrisponde alla memoria fisica, con "global" si intende una divisione logica. L'accesso da parte di thread appartenenti a blocchi distinti può potenzialmente portare a modifiche incoerenti. La global memory è accessibile attraverso transazioni da 32, 64, o 128 byte; le transazioni avvengono solo per gruppi di valori, non si può accedere ad un valore singolo. \\
+
+I valori contenuti nella memoria allocata non sono inizializzati, ma si possono inizializzare con dati provenienti dall'host (\texttt{cudaMemcpy}) oppure con un valore specifico
+\begin{center}
+	\texttt{cudaError\_t cudaMemset ( void* devPtr, int value, size\_t count)}
+\end{center}
+Assegna il valore \texttt{value} a tutti gli indirizzi contenuti nel blocco di memoria.\\
+La memoria allocata è opportunamente allineata per ogni tipo di variabile. La \texttt{cudaMalloc} restitusce \texttt{cudaErrorMemoryAllocation} in caso di fallimento.\\
+
+Lo \textbf{specificatore \texttt{\_\_device\_\_}} indica una variabile che risiede unicamente sul device. Risiede nella memoria globale (e quindi oggetti distinti per device diversi), ha il lifetime del contesto cuda in cui è stata creata. Può essere acceduta da tutti i thread e dall'host tramite la libreria runtime:
+\begin{itemize}
+	\item \texttt{cudaGetSymbolAddress()}, \texttt{cudaGetSymbolSize()}: per ottenere indirizzo e dimensione di una variabile, rispettivamente
+	\item \texttt{cudaMemcpyToSymbol()}, \texttt{cudaMemcpyFromSymbol()}: per copiare a e da una variabile, rispettivamente
+\end{itemize}
+
+Riassunto dichiarazione di variabili: 
+\begin{center}
+	\begin{tabular}{|l|l|l|l|l|}
+		\hline
+		\textbf{QUALIFIER} & \textbf{VARIABLE} & \textbf{MEMORY} & \textbf{SCOPE} & \textbf{LIFESPAN} \\
+		\hline
+		& \texttt{float var} & Register & Local & Thread \\
+		\hline
+		& \texttt{float var[100]} & Local & Local & Thread \\
+		\hline
+		\texttt{\_\_shared\_\_} & \texttt{float var} & Shared & Block & Block \\
+		\hline
+		\texttt{\_\_device\_\_} & \texttt{float var} & Global & Global & Application \\
+		\hline
+		\texttt{\_\_constant\_\_} & \texttt{float var} & Constant & Global & Application \\
+		\hline
+	\end{tabular}
+\end{center}
+
+\newpage
+
+\subsection{Pinned memory}
+La pinned memory (o page-locked memory) in CUDA è una tecnica che serve per ottimizzare il trasferimento dei dati tra la memoria del sistema (RAM) e la memoria della GPU (VRAM). Si vuole evitare il page fault della virtual memory (CPU, di default la memoria host allocata è paginabile). Esistono delle primitive per definire una memoria pinned, ovvero viene tolta la pagina dal meccanismo di virtualizzazione in modo che l'host non possa "toglierla" mentre il device la deve usare. Blocca la memoria in modo da poter fare trasferimenti asincroni al device.\\
+
+Una volta "pinnata", la memoria non sparirà dal sistema di virtualizzazione automatico della memoria host, quindi si può lavorare su quella memoria in maniera asincrona. La pinned memory può essere acceduta direttamente dal device, in modalità asincrona. Può essere letta e scritta con una bandwidth più alta rispetto alla memoria paginabile.\\
+
+Da notare che eccessi di allocazione di pinned memory potrebbero far degradare le prestazioni dell'host (ridurre la memoria paginabile inficia l'uso della virtual memory), Per allocare esplicitamente memoria pinned: 
+\begin{center}
+	\texttt{cudaError\_t cudaMallocHost(void **devPtr, size\_t count);}
+\end{center}
+E per deallocarla:
+\begin{center}
+	\texttt{cudaError\_t cudaFreeHost(void *devPtr);}
+\end{center}
+
+Questa allocazione sostituisce la malloc "normale", su host. Rende i trasferimenti host-device significativamente più veloci, al costo di un tempo più alto di allocazione.\\
+
+\newpage
+
+\subsection{Unified Virtual Addressing UVA}
+
+Si vuole avere un unico spazio di indirizzamento tra CPU e tutte le GPU. Tutti i puntatori (CPU e GPU) appartengono allo stesso spazio di indirizzi virtuali, di conseguenza è possibile passare un puntatore da host a device e viceversa senza ambiguità, entrambi possono "capire" a cosa punta quell'indirizzo.\\
+
+% End L5
