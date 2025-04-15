@@ -1,0 +1,61 @@
+% !TeX spellcheck = it_IT
+\section{Ottimizzazione delle Prestazioni}
+
+\subsection{Risorse Hardware}
+
+\paragraph{Device Query:} Per indagare le feature disponibili sul device, scoprire le proprietà. Ad esempio: quanti SM sono disponibili, quanta memoria, \dots\\
+
+Per farlo ci sono \href{http://docs.nvidia.com/cuda/cuda-runtime-api}{\texttt{Funzioni delle API runtime di CUDA}} e la CLI utility \href{https://developer.nvidia.com/nvidia-system-management-interface}{\texttt{nvidia-smi}}. Quest'ultimo permette di gestire e monitorare le GPU presenti.\\
+
+Le funzioni: 
+\begin{center}
+	\texttt{cudaError\_t cudaGetDeviceCount(\&dev\_count)} \\
+	\texttt{cudaError\_t cudaGetDeviceProperties(cudaDeviceProp* prop, int device);}
+\end{center}
+Indaga il numero di device disponibili sul sistema e restituisce le proprietà del device nella struttura \texttt{cudaDeviceProp} (rispettivamente).\\
+
+%TODO
+\subsection{Gestione ottimizzata delle risorse}
+
+L'ottimizzazione delle performance si basa su 4 strategie principali:
+\begin{itemize}
+	\item massimizzare l'utilizzazione tramite massimo parallelismo
+	\item ottimizzare l'utilizzo di memoria per avere il throughput di memoria massimo
+	\item ottimizzare l'uso di istruzioni per avere il massimo throughput
+	\item minimizzare il memory thrashing
+\end{itemize}
+
+Che strategie permettono di ottenere le migliori performance per una determinata applicazione dipende da qual'è il fattore limitante all'interno dell'applicazione stessa. Gli sforzi per l'ottimizzazione vanno quindi costantemente direzionati monitorando i fattori che limitano le performance, tramite strumenti come il CUDA profiler. \\
+
+\newpage
+
+\paragraph{Register spilling:} Il massimo numero di registri per thread può essere definito manualmente compile time con l'opzione \texttt{-maxrregcount} e si può indagare (sempre compile time) con \texttt{--ptxas-options=-v}. \\
+Limitare il numero porta a fare spilling (quindi usare la memoria locale), ma aumentando il numero di blocchi concorrenti. \\ %(maybe)
+
+\subsection{Profiling}
+
+Nvidia mette a disposizione dei \textbf{developer tools} per effettuare profiling e monitorare le applicazioni. \\
+
+\paragraph{Nsight Compute:} Profiler di livello kernel che fornisce informazioni dettagliate sulle metriche di esecuzione dei kernel CUDA. Permette una misurazione dettagliata delle prestazioni dei kernel (latency, throughput, utilizzo delle risorse, ecc.), analisi delle performance a livello di istruzione e accesso alla memoria, supporto per personalizzare la raccolta di metriche e approfondire l’ottimizzazione delle singole funzioni CUDA. \texttt{ncu, ncu-ui}, CLI e GUI.\\
+
+\paragraph{Nsight Systems:} Offre un'analisi a livello di sistema, ideale per identificare bottleneck nell'interazione tra CPU e GPU. Fornisce una visione d’insieme dell'intero flusso applicativo, monitorando la sincronizzazione tra processi e thread, il trasferimento dei dati e l'esecuzione complessiva. Permette di analizzare come le attività CUDA si integrino con il resto dell'applicazione, evidenziando le possibili ottimizzazioni per bilanciare meglio l’utilizzo di tutte le risorse hardware. \texttt{nsys, nsys-ui}, CLI e GUI.\\
+
+\newpage
+
+%back to main slides
+\subsection{Loop Unrolling}
+Il loop unrolling può essere utile per ottimizzare i cicli: questi vengono espansi ("srotolati") in modo da ridurre l'effettivo numero di iterazioni necessarie durante l'esecuzione del kernel. Il corpo del ciclo viene riscritto più volte. \\
+
+Questo ha diversi vantaggi, tra cui: 
+\begin{itemize}
+	\item riduzione dell'overhead dovuto ai controlli del ciclo
+	\item eliminazione di salti e riduzione della logica di controllo 
+	\item aumento del livello di parallelismo
+\end{itemize}
+
+Il numero di copie del corpo del loop create si chiama \textbf{unrolling factor} (quanto è stato "srotolato" il ciclo). Questa tecnica è efficace quando il numero di iterazioni è noto a priori.\\
+
+\paragraph{Warp unrolling:} L'ottimizzazione si può anche migliorare sfruttando il concetto di warp. Tutti i 32 thread all'interno di un solo warp eseguono lo stesso codice in maniera sincrona, si usa questa caratteristica per unrollare il codice di un ciclo in maniera esplicita, eliminando controlli ed eventuali divergenze tra thread. Dato che tutti gli warp eseguono lo stesso codice, l'unrolling garantisce che il flusso di esecuzione rimanga uniforme, riducendo la divergenza (percorsi di codice differenti all'interno del medesimo warp). \\
+
+% End L6
+

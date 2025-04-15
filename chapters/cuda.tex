@@ -460,3 +460,71 @@ Questa allocazione sostituisce la malloc "normale", su host. Rende i trasferimen
 Si vuole avere un unico spazio di indirizzamento tra CPU e tutte le GPU. Tutti i puntatori (CPU e GPU) appartengono allo stesso spazio di indirizzi virtuali, di conseguenza è possibile passare un puntatore da host a device e viceversa senza ambiguità, entrambi possono "capire" a cosa punta quell'indirizzo.\\
 
 % End L5
+
+%Unified memory
+
+La unified memory è una memoria "comoda", fornisce un puntatore unico per tutte le CPU e GPU presenti nel sistema. Spazio di indirizzamento unico per CPU e GPU.\\
+
+Con "\textbf{Managed Memory}" si fa riferimento ad allocazioni della unified memory. All'interno di un kernel si possono usare entrambi i tipi di memoria: 
+\begin{itemize}
+	\item managed memory, controllata dal sistema
+	\item un-managed memory, controllata esplicitamente dall'applicazione
+\end{itemize}
+Tutte le operazioni CUDA valide sulla memoria del dispositivo sono valide anche sulla memoria managed.\\
+
+Per fare allocazione dinamica:
+\begin{center}
+	\texttt{cudaError\_t cudaMallocManaged(void **devPtr, size\_t size, unsigned int flags=0)}
+\end{center}
+"rimpiazza" \texttt{cudaMalloc}, la \texttt{flag} indica chi condivide il puntatore con il device:
+\begin{itemize}
+	\item \texttt{cudaMemAttachHost}: solo la CPU
+	\item \texttt{cudaMemAttachGlobal}: anche tutte le altre GPU
+\end{itemize}
+
+Nuova \textbf{keyword}: \textbf{\texttt{\_\_managed\_\_}}, si tratta di un qualifier che denota scope globale, accessibile da CPU e GPU.\\
+
+Con l'uso "misto" di memoria bisogna porre attenzione alla sincronizzazione tra CPU e GPU, onde evitare problemi.
+
+\newpage
+
+\subsection{Pattern di Accesso alla Global Memory}
+
+Gli accessi alla memoria del dispositivo possono avvenire in transazioni da 32, 64 o 128 byte. Le applicazioni GPU tendono (a volte) ad essere limitate dalla memory bandwidth, quindi massimizzare il throughput effettivo è importante. In generale, per rendere efficienti le transazioni in memoria:
+\begin{itemize}
+	\item minimizzare il numero di transazioni per servire il massimo numero di accessi 
+	\item considerare che il numero di transazioni e throughput ottenuto variano con la compute capability
+\end{itemize}
+
+Per migliorare le prestazioni in lettura e scrittura occorre ricordare che: 
+\begin{itemize}
+	\item le istruzioni vengono eseguite a livello di warp e gli accessi in memoria dipendono dalle operazioni svolte nel warp
+	\item per un dato indirizzo si esegue un'operazione di loading o storing (gestione diversa)
+	\item i 32 thread presentano una singola richiesta di accesso, che viene servita da una o più transazioni in memoria
+\end{itemize}
+
+In base a come sono distribuiti gli indirizzi di memoria, gli accessi alla stessa possono essere classificati in pattern distinti. Tutti gli accessi a memoria globale passano dalla cache L2, molti passano anche dalla L1. Se entrambe le memorie vengono usate gli accessi sono da 128 byte, altrimenti, se viene usata solo la L2, gli accessi sono a 32 byte. \\
+Per le architetture che usano cache L1, queste possono essere esplicitamente abilitate o disabilitate a compile time.\\
+
+Bisogna rispettare allineamento e coalescenza per sfruttare al meglio le transazioni di memoria; per avere accessi in memoria efficienti è necessario combinare in un unica transazione accessi multipli a memoria allineati e coalescenti.\\
+
+Accesso \textbf{allineato}: quando il primo indirizzo della transazione è un multiplo pari della granularità della cache che viene usata per servire la transazione (32 byte per la cache L2 o 128 byte per la cache L1).\\
+Accesso \textbf{coalescente:} quando tutti i 32 thread in un warp accedono a un blocco contiguo di memoria.\\
+
+In un SM i dati seguono pipeline attraverso i seguenti tre cache/buffer paths dipendentemente da quale tipo di device memory si accede:
+\begin{itemize}
+	\item L1/L2 cache
+	\item Constant cache
+	\item Read-only cache
+\end{itemize}
+
+L1/L2 cache rappresenta il default path. Il fatto che un'operazione di load in global memory passi attraverso la cache L1 cache dipende da compute capability e compiler options.\\
+
+\paragraph{Scritture:} Le write vengono servite in modo diverso, non viene usata la cache L1, ma le store sono cachate solo in L2, prima di essere inviate alla device memory in segmenti da 32  byte; vengono trasferiti 1,2 o 4 segmenti alla volta.\\
+
+Quando forzati a fare accessi (letture/scritture) non coalescenti si può usare la shared memory come "passaggio" per rendere le opreazioni effettive in memoria coalescenti.\\ 
+
+%s62 onwards
+%Si vuole fare in modo che i thread concorenti accedano a posizioni di memoria vicine. Per una matrice, la direzione di accesso dovrebbe essere sulle colonne, ogni thread una colonna, non una riga, perché in memoria le colonne sono sequenziali.\\
+%
+%Uso shared memory, boom, funziona tutto. %idk
