@@ -59,3 +59,111 @@ Il numero di copie del corpo del loop create si chiama \textbf{unrolling factor}
 
 % End L6
 
+\subsection{Parallelismo dinamico}
+
+Ci siamo mai chiesti se si può lanciare un kernel all'interno di un kernel? Not really, ma potrebbe essere utile (come ad esempio per la ricorsione). Nuova feature introdotta dalle CC 3.5: ogni kernel può lanciare un altro kernel e gestire dipendenze inter-kernel. Elimina la necessità di comunicare con la CPU, rende più semplice creare e ottimizzare pattern di esecuzione ricorsivi e data-dependent. Senza parallelismo dinamico la CPU deve lanciare ogni kernel.\\
+
+L'idea dietro il parallelismo dinamico è generare dinamicamente kernel in base ai dati: se ci sono elementi diversi/zone della matrice di lavoro che richiedono sforzi diversi possiamo fare in modo che i kernel sian \textit{ad hoc} per migliorare l'efficienza.\\
+
+%Esempio: Mandelbrot %Ci saranno le slide, forse, da qualche parte
+
+Senza permettere al kernel di lanciare altri kernel il modello di esecuzione è inefficiente: la CPU non può essere conscia dei dati, ma è lei che deve lanciare \textit{tutti} i kernel, la GPU valuta se è necessario lanciare nuovi kernel (in base ai dati) e tali informazioni vanno passate nuovamente alla CPU per lanciare nuovi kernel.\\
+
+La soluzione è il \textbf{parallelismo dinamico}: la GPU può lanciare nuovi kernel, permette di ridurre la dipendenza dalla CPU e migliorare il throughput del kernel (se fatto bene). Consente carichi di lavoro dinamici senza penalizzare le prestazioni.\\
+
+Vogliamo mettere carico di lavoro dove serve, scegliere la granularità del lavoro in base ai dati. Possiamo posporre la decisione delle dimensioni di blocchi e griglia fino a runtime. Possiamo adattare il lavoro in base a \textbf{decisioni data-driven}, non da schemi fissi come visto fino ad ora.\\
+
+Esempio: un kernel figlio viene chiamato all'interno di un kernel padre e quest'ultimo può utilizzare i risultati prodotti dal figli senza nessuna interazione da parte della CPU
+\begin{minted}{c}
+__global__ ChildKernel(void* data) {
+	//Operate on data
+}
+__global__ ParentKernel(void* data) {
+	ChildKernel<<<16, 1>>>(data);
+}
+// In Host Code
+ParentKernel<<<256, 64>>(data);
+\end{minted}
+
+Sarebbe da limitare un attimo l'annidamento: se ogni thread facesse una chiamata a kernel figlio \textit{potrebbero} diventare tanti kernel lanciati; sarebbe carino inserire \textbf{control flow attorno ai lanci}, per esempio limitando il lancio ad 1 per blocco del padre (\texttt{threadIdx.x == 0}).\\
+
+\paragraph{Sincronizzazione:} Si ha una sincronizzazione implicita, il padre non può terminare prima dei figlio, un kernel non è considerato completato finché ha figli attivi. Rimane la possibilità di avere sincronizzazione esplicita, altrimenti il kernel padre non ha garanzie di poter vedere i dati elaborati dal figlio. \\
+
+%Slide 7
+
+\subsection{Librerie CUDA}
+Le librerie sono comode e quelle CUDA sono accelerate dalla GPU. Le API di molte di queste sono volutamente simili a quelle della libreria standard. Permettono porting di codice da sequenziale a parallelo con \textit{minimo sforzo}, nessun tempo di mantenimento della libreria.\\
+
+Esempi di librerie CUDA:
+\begin{center}
+	\begin{tabular}{@{} ll @{}}
+		\hline
+		\textbf{Libreria}                     & \textbf{Dominio}                                    \\ \hline
+		cuFFT (NVIDIA)                        & Fast Fourier Transforms Linear                      \\
+		cuBLAS (NVIDIA)                       & Linear Algebra (BLAS Library)                       \\
+		cuSPARSE (NVIDIA)                     & Sparse Linear Algebra                               \\
+		cuRAND (NVIDIA)                       & Random Number Generation                            \\
+		NPP (NVIDIA)                          & Image and Signal Processing                         \\
+		CUSP (NVIDIA)                         & Sparse Linear Algebra and Graph Computations        \\
+		CUDA Math Library (NVIDIA)            & Mathematics                                         \\
+		Trust (terze parti)                   & Parallel Algorithms and Data Structures             \\
+		MAGMA (terze parti)                   & Next generation Linear Algebra                      \\ \hline
+	\end{tabular}
+\end{center}
+
+\paragraph{Workflow tipico:} Per l'utilizzo di una libreria CUDA, il workflow generico è:
+\begin{enumerate}
+	\item Creare un \textbf{handle} specifico della libreria (per la gestione delle informazioni e relativo contesto in cui essa opera, es. uso degli stream)
+	\item \textbf{Allocare la device memory} per gli input e output alle funzioni della libreria (convertirli al formato specifico di uso della liberia, es. converti array 2D in column-major order)
+	\item \textbf{Popolare con i dati} nel formato specifico
+	\item \textbf{Configurare} le computazioni per l'esecuzione (es. dimensione dei dati)
+	\item Eseguire la \textbf{chiamata della funzione} di libreria che avvia la computazione sulla GPU
+	\item \textbf{Recuperare i risultati} dalla device memory
+	\item Se necessario, \textbf{(ri)convertire i dati} nel formato specifico o nativo dell'applicazione
+	\item \textbf{Rilasciare le risorse} CUDA allocate per la data libreria
+\end{enumerate}
+
+\subsubsection{cuBLAS - Basic Linear Algebra Subproblems}
+
+Usata per calcolo scientifico ed ingegneristico per problemi di algebra lineare numerica
+\begin{itemize}
+	\item risoluzione di sistemi lineari
+	\item ricerca di autovalori e/o autovettori
+	\item calcolo della SVD (valori e vettori singolari)
+	\item fattorizzazione di matrici
+\end{itemize}
+
+Come BLAS, le funzioni di cuBLAS sono divisi in livelli: 
+\begin{itemize}
+	\item Livello 1: per operazioni vettore-vettore
+	\item Livello 2: per operazioni vettore-matrice
+	\item Livello 3: per operazioni matrice-vettore
+\end{itemize}
+
+Usa \textbf{column-major order} (leggo le colonne dall'alto verso il basso) perché chiunque ha scritto la libreria è stronzo (colpa di Fortran). Esempio: 
+$$
+\left[
+\begin{array}{c c c}
+	1 & 2 & 3 \\
+	4 & 5 & 6 \\
+	7 & 8 & 9
+\end{array}
+\right]
+\rightarrow \left[\begin{array}{c c c c c c c c c}
+	1 & 4 & 7 & 2 & 5 & 8 & 3 & 6  & 9
+\end{array}\right]
+\quad I(r,c) = c \cdot M  + r 
+$$
+Dove $(r,c)$ sono le coordinate del valore cercato e $M$ è l'altezza della matrice (dimensioni $M \times N$).\\
+
+\paragraph{Operare con cuBLAS:} L'iter tipico per usare cuBLAS è 
+\begin{enumerate}
+	\item creare un handle con \texttt{cublasCreateHandle}
+	\item allocare la memoria sul device con \texttt{cudaMalloc}
+	\item poplare la device memory con gli input necessari usando \texttt{cublasSetVector} e \texttt{cublasSetMatrix}
+	\item effettuare le chiamate di libreria necessarie
+	\item recuperare i risultati dalla device memory usando \texttt{cublasGetVector} e \texttt{cublasGetMatrix}
+	\item rilasciare le risorse CUDA e cuBLAS con \texttt{cudaFree} e \texttt{cublasDestroy}, rispettivamente
+\end{enumerate}
+
+%TODO: Finire di scrivere tutte le librerie
