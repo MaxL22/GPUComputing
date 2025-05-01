@@ -166,4 +166,106 @@ Dove $(r,c)$ sono le coordinate del valore cercato e $M$ è l'altezza della matr
 	\item rilasciare le risorse CUDA e cuBLAS con \texttt{cudaFree} e \texttt{cublasDestroy}, rispettivamente
 \end{enumerate}
 
-%TODO: Finire di scrivere tutte le librerie
+\paragraph{Funzioni all'interno di cuBLAS:} Per trasferire vettori da CPU a GPU:
+\begin{itemize}
+	\item Copia \texttt{n} elementi di dimensione \texttt{elemSize} da \texttt{cpumem} sulla CPU ad un vettore \texttt{gpumem} sulla GPU
+	\begin{minted}{c}
+cublasSetVector(int n, int elemSize, const void *cpumem, 
+	int incx, void *gpumem, int incy)
+	\end{minted}
+	\item L'inverso di prima (da GPU a CPU)
+	\begin{minted}{c}
+cublasGetVector(int n, int elemSize, const void *gpumem, 
+	int incx, void *cpumem, int incy)
+	\end{minted}
+\end{itemize}
+
+Per trasferire matrici (sempre column-major order): 
+\begin{itemize}
+	\item copia una matrice \texttt{rows} $\times$ \texttt{cols}, di elementi grossi \texttt{elemSize}, da \texttt{A} nella memoria CPU a \texttt{B} nella memoria GPU
+	\begin{minted}{c}
+cublasSetMatrix(int rows, int cols, int elemSize, 
+	const void *A, int lda, void *B, int ldb)
+	\end{minted}
+	esiste anche il corrispettivo \texttt{cublasGetMatrix()} che fa l'inverso
+	\item come \texttt{cublasGetMatrix()}, ma asincrono (rispetto all'host), usando il parametro \texttt{stream} fornito
+	\begin{minted}{c}
+cublasGetMatrixAsync(int rows, int cols, int elemSize, 
+	const void *A, int lda, void *B, 
+	int ldb, cudaStream_t stream)
+	\end{minted}
+\end{itemize}
+
+Per gestire la libreria serve un \textbf{handle}, il quale si può generare tramite
+\begin{minted}{c}
+cublasCreate(cublasHandle_t* handle)
+\end{minted}
+Viene passato ad ogni chiamata di funzione della libreria successiva. Al termine
+\begin{minted}{c}
+cublasDestroy(cublasHandle_t* handle)
+\end{minted}
+per distruggerlo. Il tipo dell'handle è \texttt{cublasHandle\_t}. Esiste un tipo \texttt{cublasStatus\_t} usato per il report degli errori.\\
+
+Per trasferimenti device-device: copia \texttt{n} elementi da \texttt{x} a \texttt{y}:
+\begin{minted}{c}
+cublasScopy(handle, n, x, incx, y, incy)
+\end{minted}
+
+In generale la libreria segue una naming convention \texttt{cublas<T>operation}, dove \texttt{<T>} può essere: 
+\begin{itemize}
+	\item \texttt{S} per parametri di tipo \texttt{float}
+	\item \texttt{D} per \texttt{double}
+	\item \texttt{C} per \texttt{complex  floats}
+	\item \texttt{Z} per \texttt{complex double}
+\end{itemize}
+Ad esempio, per l'operazione \texttt{axpy} le funzioni disponibili sono \texttt{cublasSaxpy}, \texttt{cublasDaxpy}, \texttt{cublasCaxpy}, \texttt{cublasZaxpy}.\\
+
+Si usa un valore di tipo \texttt{cublasOperation\_t} per indicare operazioni su matrici all'interno di funzioni: 
+\begin{itemize}
+	\item \texttt{CUBLAS\_OP\_N} per non-transpose
+	\item \texttt{CUBLAS\_OP\_T} per transpose
+	\item \texttt{CUBLAS\_OP\_C} per conjugate transpose
+\end{itemize}
+
+Per fare
+$$ result = \sum_{i=1}^{n} x[k] \cdot y[j], \quad k = 1 + (i-1) \cdot incx, \quad j = 1 + (i-1) \cdot incy $$
+tra vettori \texttt{x} e \texttt{y} di \texttt{n} elementi (dimensione dei tali nella naming convention) e mettere il risultato in \texttt{result}
+\begin{minted}{c}
+cublasStatus_t cublasSdot(cublasHandle_t handle, int n, 
+	const float *x, int incx, const float *y, 
+	int incy, float result)
+\end{minted}
+
+Per fare 
+$$ y[i] = \alpha \cdot x[i] + y[i] \quad \forall i \in n $$
+con vettori \texttt{x} e \texttt{y} di dimensione \texttt{n}, risultato nel secondo vettore \texttt{y}
+\begin{minted}{c}
+cublasStatus_t cublasSaxpy(cublasHandle_t handle, int n,
+	const float *alpha, const float *x, int incx, 
+	const float *y, int incy)
+\end{minted}
+
+Per fare 
+$$ y = \alpha Ax + \beta y$$
+dove $\alpha$ e $\beta$ sono scalari, $A$ è una matrice, $x$ e $y$ sono vettori
+\begin{minted}{c}
+cublasStatus_t cublasSgemv(cublasHandle_t handle, 
+	cublasOperation_t trans, int m, int n, 
+	const float *alpha, const float *A, 
+	int lda, const float *x, int incx, 
+	const float *beta, float *y, int incy)
+\end{minted}
+
+Per fare
+$$ C = \alpha AB + \beta C$$
+dove $\alpha$ e $\beta$ scalari, $A$, $B$ e $C$ matrici
+\begin{minted}{c}
+cublasStatus_t cublasSgemm(cublasHandle_t handle,
+	cublasOperation_t transa, cublasOperation_t transb,
+	int m, int n, int k, const float *alpha,
+	const float *A, int lda,
+	const float *B, int ldb,
+	const float *beta, float *C, int ldc)
+\end{minted}
+
+%Fine cuBlas, s40
