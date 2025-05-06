@@ -268,4 +268,72 @@ cublasStatus_t cublasSgemm(cublasHandle_t handle,
 	const float *beta, float *C, int ldc)
 \end{minted}
 
-%Fine cuBlas, s40
+\newpage
+
+\subsubsection{cuRAND}
+
+La libreria cuRAND fornisce semplici ed efficienti \textbf{generatori di numeri}. Permette sequenze: 
+\begin{itemize}
+	\item Pseudo-random: soddisfa proprietà statistiche di una vera sequenza random, ma generata da un algoritmo deterministico
+	\item Quasi-random: sequenza di punti $n$-dimensionali uniformemente generati secondo un algoritmo deterministico
+\end{itemize}
+
+La libreria si compone di due parti:
+\begin{itemize}
+	\item \texttt{curand.h} per l'host
+	\item \texttt{curand\_kernel.h} per il device
+\end{itemize}
+
+\paragraph{Host API:} Dalla \href{https://docs.nvidia.com/cuda/curand/index.html}{\texttt{documentazione}}, passaggi:
+\begin{enumerate}
+	\item Crea un \textbf{nuovo generatore} del tipo desiderato con \texttt{curandCreateGenerator()}
+	\item Setta i \textbf{parametri} del generatore; ad esempio: \texttt{curandSetPseudoRandomGeneratorSeed()} per settare il seed
+	\item Alloca la memoria device con \texttt{cudaMalloc()}
+	\item Genera i valori casuali necessari con \texttt{curandGenerate()} (o altre funzioni)
+	\item Usa i valori
+	\item Quando non serve più il generatore va distrutto con \texttt{curandDestroyGenerator()}
+\end{enumerate}
+
+Alcune funzioni per l'host: 
+\begin{itemize}
+	\item Per creare il generatore
+	\begin{minted}{c}
+curandCreateGenerator(&g, GEN_TYPE)
+	\end{minted}
+	Dove il parametro \texttt{GEN\_TYPE} può essere \texttt{CURAND\_RNG\_PSEUDO\_DEFAULT}, oppure \texttt{CURAND\_RNG\_PSEUDO\_XORWOW} (differenze trascurabili)
+	
+	\item Per impostare il seed
+	\begin{minted}{c}
+curandSetRandomGeneratorSeed(g, SEED)
+	\end{minted}
+	ma importa poco, uno qualunque va bene (e.g, \texttt{time(NULL)})
+	
+	\item Per generare una distribuzione
+	\begin{minted}{c}
+curandGenerate______(…)
+	\end{minted}
+	dipende dalla distribuzione che si vuole generare, ad esempio: \texttt{curandGenerateUniform(g, src, n)} oppure \texttt{curandGenerateNormal(g, src, n, mean, stddev)}. 
+	\item Per distruggere il generatore
+	\begin{minted}{c}
+curandDestroyGenerator(g)
+	\end{minted}
+\end{itemize}
+
+La funzione \texttt{curandGenerate()} permette di generare valori in maniera asincrona, molto più veloce per quantità elevate di valori. Usare questa libreria richiederebbe poi di dover passare i dati generati alla GPU (\texttt{src} all'interno della funzione è un puntatore host), introducendo overhead. Per risolvere si può usare la Device API.\\
+
+\paragraph{Device API:} Per generare valori sul device: 
+\begin{enumerate}
+	\item Pre-allocare un set di cuRAND state objects nella device memory per ogni thread (gestiscono lo stato)
+	\item Opzionale, pre-allocare device memory per tenere i valori generati (se devono poi essere passati all'host o essere mantenuti per kernel successivi)
+	\item Inizializzare lo stato di tutti gli state objects con una kernal call
+	\item Chiamare una funzione cuRAND per generare valori casuali usando gli state objects allocati
+	\item Opzionale, trasferire i valori all'host (se è stata allocata la memoria in precedenza)
+\end{enumerate}
+
+\newpage
+
+\subsubsection{cuFFT - Fast Fourier Transform}
+
+La libreria cuFFT fornisce una implementazione della \href{https://en.wikipedia.org/wiki/Fast_Fourier_transform}{\texttt{Fast Fourier Transform FFT}} (segnali dal dominio del tempo a frequenze e relativa inversa). L'input della FFT è un sampling di un segnale. La librerie permette trasformate 1D, 2D o 3D. Si basa sugli algoritmi per FFT di \href{https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm}{\texttt{Cooley-Tukey}} e \href{https://en.wikipedia.org/wiki/Chirp_Z-transform#Bluestein.27s_algorithm}{\texttt{Bluestein}}. Permette una esecuzione asincrona con valori che possono essere \texttt{rea\texttt{l}, \texttt{complex}, \texttt{float}, }double. \\
+
+%s63
