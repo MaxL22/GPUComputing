@@ -332,8 +332,260 @@ La funzione \texttt{curandGenerate()} permette di generare valori in maniera asi
 
 \newpage
 
-\subsubsection{cuFFT - Fast Fourier Transform}
+%\subsubsection{cuFFT - Fast Fourier Transform}
+%
+%La libreria cuFFT fornisce una implementazione della \href{https://en.wikipedia.org/wiki/Fast_Fourier_transform}{\texttt{Fast Fourier Transform FFT}} (segnali dal dominio del tempo a frequenze e relativa inversa). L'input della FFT è un sampling di un segnale. La librerie permette trasformate 1D, 2D o 3D. Si basa sugli algoritmi per FFT di \href{https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm}{\texttt{Cooley-Tukey}} e \href{https://en.wikipedia.org/wiki/Chirp_Z-transform#Bluestein.27s_algorithm}{\texttt{Bluestein}}. Permette una esecuzione asincrona con valori che possono essere \texttt{rea\texttt{l}, \texttt{complex}, \texttt{float}, }double. \\
+%
+%%s63
 
-La libreria cuFFT fornisce una implementazione della \href{https://en.wikipedia.org/wiki/Fast_Fourier_transform}{\texttt{Fast Fourier Transform FFT}} (segnali dal dominio del tempo a frequenze e relativa inversa). L'input della FFT è un sampling di un segnale. La librerie permette trasformate 1D, 2D o 3D. Si basa sugli algoritmi per FFT di \href{https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm}{\texttt{Cooley-Tukey}} e \href{https://en.wikipedia.org/wiki/Chirp_Z-transform#Bluestein.27s_algorithm}{\texttt{Bluestein}}. Permette una esecuzione asincrona con valori che possono essere \texttt{rea\texttt{l}, \texttt{complex}, \texttt{float}, }double. \\
+%aggiorna slied 7, algoritmo più preciso
+%Togli la FFT lib, non la spiega, non serve dai
 
-%s63
+\subsection{Stream e Concorrenza}
+
+Si possono avere diversi gradi di concorrenza in CUDA: 
+\begin{itemize}
+	\item \textbf{CPU/GPU concurrency} (modello ibrido): si tratta di dispositivi distinti e operano indipendentemente
+	\item \textbf{Memcpy/kernel processing concurrency}: grazie al DMA il trasferimento tra host e device può avere luogo mentre gli SM processano i kernel
+	\item \textbf{Kernel concurrency}: si possono eseguire fino a 128 kernel in parallelo, anche da thread di CPU distinti
+	\item \textbf{Grid-level concurrency}: uso di stream multipli per operazioni indipendenti
+	\item \textbf{Multi-GPU concurrency}: si può ripartire il carico tra multiple GPU che lavorano in parallelo
+\end{itemize}
+
+\subsubsection{CUDA Streams}
+
+Uno \textbf{stream CUDA} è riferito a sequenze di operazioni CUDA asincrone eseguite dal device, nell'ordine che viene stabilito dal codice host. Queste operazioni vengono inserite in una coda FIFO (incapsulate dallo stream), per poi essere gestita dallo scheduling (devono essere serviti). Operazioni tipiche possono essere: trasferimento dati, lancio kernel, gestione eventi di sincronizzazione. L'esecuzione di operazioni in uno stream è sempre asincrona rispetto all'host.\\
+
+Le operazioni appartenenti a stream distinti non hanno restrizioni sull'ordine di esecuzione uno con l'altro (ma possono essere imposte); ogni stream è asincrono rispetto all'host e sono tutti indipendenti l'uno con l'altro.\\
+
+\paragraph{Parallelismo Grid-level:} Dal punto di vista CUDA le operazioni di stream distinti vengono eseguite in parallelo (concorrentemente). I comandi immessi su uno stream possono essere eseguiti quando tutte le dipendenze del comando sono soddisfatte. Le dipendenze possono essere comandi lanciati in precedenza sullo stesso flusso o dipendenze da altri flussi; i.e., ogni stream è indipendente da tutti gli altri, idealmente vengono eseguiti tutti in parallelo. \\
+
+Il completamento con successo della chiamata di sincronizzazione garantisce il completamento corretto di tutti i comandi lanciati.\\
+
+\paragraph{Creare API Stream:} Bisogna inserire degli oggetti che si chiamano "stream". Passaggi: 
+\begin{itemize}
+	\item creare uno stream non nullo
+	\begin{minted}{c}
+cudaError_t cudaStreamCreate(cudaStream_t* pStream );
+	\end{minted}
+	\item lancio del kernel
+	\begin{minted}{c}
+kernel_name<<< grid, block, sharedMemSize, pStream >>>
+	(argument list);
+	\end{minted}
+	\item eliminazione di stream:
+	\begin{minted}{c}
+cudaError_t cudaStreamDestroy(cudaStream_t pStream );
+	\end{minted}
+\end{itemize}
+
+Anche le operazioni di trasferimento: per \textbf{allocare} spazio su \textbf{pinned memory}:
+\begin{minted}{c}
+cudaError_t cudaMallocHost(void **ptr, size_t size);
+cudaError_t cudaHostAlloc(void **pHost, size_t size, 
+	unsigned int flags);
+\end{minted}
+Alloca su host memoria non paginabile (pinned memory), \texttt{flag} indica specifiche proprietà di allocazione (se 0 le due API sono uguali). In seguito, per fare \textbf{trasferimento asincrono} basato su pinned memory
+\begin{minted}{c}
+cudaError_t cudaMemcpyAsync(void* dst, const void* src, 
+	size_t count, cudaMemcpyKind kind, 
+	cudaStream_t stream );
+\end{minted}
+
+\paragraph{Tipi di stream:} Le operazioni CUDA vengono eseguite esplicitamente o implicitamente su uno stream. Ne esistono di due tipi: 
+\begin{itemize}
+	\item dichiarato implicitamente (NULL stream o deault stream, si può indicare esplicitamente con \texttt{0} al posto del valore di stream nella chiamata a kernel)
+	\item dichiarato esplicitamente (non-NULL stream)
+\end{itemize}
+
+Il default stream interviene quando non viene usato esplicitamente uno stream. Il comportamento in relazione agli altri stream dipende dalla flag di compilazione:
+\begin{itemize}
+	\item \texttt{--default-stream legacy} (or noflag): vecchio comportamento in cui un lancio di \texttt{cudaMemcpy} o del kernel sullo stream predefinito si blocca/sincronizza con altri stream
+	\item \texttt{--default-stream per-thread}: nuovo comportamento in cui il default stream non influenza gli altri
+\end{itemize}
+
+%Default stream: %s10?
+
+\paragraph{Maintaining Occupancy:} La situazione ideale è avere kernel grandi che occupano completamente il device, mentre kernel piccoli possono occupare il device in maniera meno organizzata, portando a sequenzializzazione all'interno dello stream. Dividere su più stream i kernel "piccoli" permette di mantenere l'efficienza togliendo dei vincoli di sequenzialità che porterebbe ad una situazione di bassa occupancy.\\
+
+Meglio usare stream (asincroni concorrenti) non default per:
+\begin{itemize}
+	\item sovrapporre articolate computazioni host e device
+	\item sovrapporre computazioni host e trasferimento dati host-device
+	\item sovrapporre trasferimento dati host-device e computazioni device
+	\item computazioni concorrenti su device
+\end{itemize}
+
+Dalla Cuda Programming Guide:
+\begin{itemize}
+	\item le applicazioni gestiscono la concorrenza attraverso gli stream
+	\item uno stream è una sequenza di comandi (anche da thread host diversi) eseguiti in ordine
+	\item stream diversi potrebbero eseguire i comandi senza rispettare l'ordine relativo tra loro o in maniera concorrente
+\end{itemize}
+
+Insomma, l'idea è alzare un'altra volta il grado di concorrenza, non abbiamo più kernel sequenziali le cui istruzioni sono eseguite in parallelo, anche i kernel possono essere eseguiti parallelamente tra loro su stream diversi.\\
+
+\paragraph{Overlapping behavior:} Si possono avere diversi tipi di sovrapposizioni: 
+\begin{itemize}
+	\item overlap \textbf{traferimento dati ed esecuzione kernel}: alcuni dispositivi possono avere trasferimenti asincroni da o verso la GPU concorrentemente all'esecuzione di kernel; per controllare se presente proprietà \texttt{asyncEngineCount} (non zero vuol dire supportata); la memoria host deve essere page-locked
+	\item esecuzione di \textbf{kernel concorrenti}: da CC 2.x in su si possono avere multipli kernel concorrenti; si può verificare il supporto tramite la proprietà \texttt{concurrentKernels}; il numero massimo di kernel concorrenti possibili dipende dalla CC, 128 recentemente
+	\item \textbf{trasferimenti dati concorrenti}: si possono sovrapporre copie da e verso il device (per i device che supportano la cosa, \texttt{asyncEngineCount} a 2); per avere sovrapposizione la memoria host coinvolta deve essere page-locked
+\end{itemize}
+
+\paragraph{Stream Synchronize:} Tutte le operazioni sono asincrone, può essere utile controllare se tutte le operazioni in uno stream sono state completate o meno.\\
+
+Blocco dell'host sullo stream: 
+\begin{minted}{c}
+cudaError_t cudaStreamSynchronize(cudaStream_t stream);
+\end{minted}
+Forza il blocco dell'host fino a che tutte le operazioni dello steram sono state completate. Da notare che \texttt{cudaDeviceSynchronize()} blocca l'host finché non sono stati completati tutti i comandi su tutti gli stream.\\
+
+Controllo stream completato:
+\begin{minted}{c}
+cudaError_t cudaStreamQuery(cudaStream_t stream);
+\end{minted}
+Controlla se le operazioni sono completate ma non forza blocco dell'host in caso negativo. Ritorna \texttt{cudaSuccess} o \texttt{cudaErrorNotReady}.\\
+
+\newpage
+
+\paragraph{Sovrapporre kernel e trasferimento dati:} Devono essere verificati diversi requisiti perché si possa effettuare questa sovrapposizione:
+\begin{enumerate}
+	\item Il device deve essere capace di "concurrent copy and execution", indagato con il campo \texttt{deviceOverlap} della struct \texttt{cudaDeviceProp} (tutti i device con compute capability $\geq$1.1 hanno questa capacità)
+	\item Il kernel e trasferimento dati devono appartenere a differenti non-default stream
+	\item La host memory coinvolta nel trasferimento deve essere pinned memory
+\end{enumerate}
+
+Se si possono fare trasferimenti ed esecuzione dati parallelamente, potrebbe essere conveniente dividere un blocco di dati grande $N$ in $M$ sotto-gruppi da elaborare, permettendo di sovrapporre trasferimenti H2D (e poi D2H) con l'esecuzione di kernel. I trasferimenti sono gestiti tramite DMA; usiamo $N/M$ stream.\\
+
+\paragraph{Default Stream prima di CUDA 7:} Il funzionamento è cambiato da CUDA 7, ma il default stream è utile quando la concorrenza non è cruciale al fine delle performance. Prima di CUDA 7, ogni device ha un defult stream usato per tutti i thread host, il quale porta a sincronizzazione implicita.\\
+
+\paragraph{Sincronizzazione rispetto NULL-stream:} Un NULL-stream blocca tutte le precedenti operazioni dell'host con la sola eccezione del lancio kernel. Anche se i non-NULL stream sono non-bloccanti rispetto all'host, possono esssere sincroni o asincroni rispetto al NULL-stream. \\
+
+Per questo gli stream non-NULL possono essere di due tipi: 
+\begin{itemize}
+	\item Blocking stream: lo stream NULL è bloccante
+	\item Non-blocking stream: lo stream NULL non è bloccante
+\end{itemize}
+
+Gli stream creati usando \texttt{cudaStreamCreate} sono bloccanti: l'esecuzione di operazioni in questi stream vengono bloccate in attesa del completamento di operazioni dello stream NULL.  Il NULL stream è implicitamente definito e sincronizza con tutti gli altri stream bloccanti nello stesso contesto CUDA. In generale il NULL stream non si sovrappone con nessun altro stream bloccante.\\
+
+Dal punto di vista dell'host ogni kernel è asincrono e non-bloccante, ma nell'esempio: 
+\begin{minted}{c}
+kernel_1<<<1, 1, 0, stream_1>>>();
+kernel_2<<<1, 1>>>();
+kernel_3<<<1, 1, 0, stream_2>>>();
+\end{minted}
+\texttt{kernel\_2} non può partire finché non termina \texttt{kernel\_1} e similmente \texttt{kernel\_3} con \texttt{kernel\_2}.\\
+
+CUDA runtime permette di definire il comportamento di uno stream non-NULL in relazione al NULL stream:
+\begin{itemize}
+	\item NULL stream e non-NULL stream sono generalmente bloccanti tra loro
+	\item \texttt{cudaStreamCreateWithFlags(*stream, flag)} permette di aggiungere la flag \texttt{cudaStreamNonBlocking} per rendere lo stream creato non bloccante
+\end{itemize}
+Inoltre, in generale, stream non-NULL sono tra loro non bloccanti.\\
+
+\paragraph{Post Cuda 7:} Prima di CUDA 7, ogni device ha un singolo default stream usato per tutti i thread dell'host che causano sincronizzazione implicita. CUDA 7 introduce la nuova opzione \texttt{per-thread default stream}, che ha due effetti:
+\begin{enumerate}
+	\item Assegna a ogni thread dell’host il proprio default stream (comandi inviati al default stream da diversi thread dell'host possono eseguire concorrentemente)
+	\item I default stream sono stream regolari (comandi nel default stream possono eseguire in concorrenza con quelli in un non-default stream)
+\end{enumerate}
+Per abilitare per-thread default stream compilare con \texttt{nvcc} command-line option \texttt{--default-stream per-thread}, o definire la macro per il preprocessore \texttt{\#define CUDA\_API\_PER\_THREAD\_DEFAULT\_STREAM}.\\
+
+\paragraph{Priorità negli stream:} Si possono creare stream con priorità (da CC 3.5). Una grid con più alta priorità può prelazionare il lavoro già in esecuzione con più bassa priorità. Hanno effetto solo su kernel e non su data transfer. Priorità al di fuori del range vengono riportate automaticamente nel range.\\
+
+Per creare e gestire uno stream con priorità si usano le funzioni:
+\begin{minted}{c}
+cudaError_t cudaStreamCreateWithPriority(
+	cudaStream_t* pStream, unsigned int flags, int priority);
+\end{minted}
+Crea un nuovo stream con priorità intera e ritorna l'handle in \texttt{pStream}.
+
+\begin{minted}{c}
+cudaError_t cudaDeviceGetStreamPriorityRange(
+	int *leastPriority, int *greatestPriority);
+\end{minted}
+Restituisce la minima e massima priorità del device (la più alta è la minima).\\
+
+\paragraph{Host Functions (Callback):} Si ha la possibilità di inserire una funzione host, senza introdurre sincronizzazione o interrompere il flusso dello stream. Questa funzione viene eseguita sull'host una volta che tutti i comandi forniti allo stream prima della chiamata sono stati eseguiti.\\
+
+\subsubsection{CUDA Event}
+%Controllo e sincronizzazoione tra stream.
+
+Un \textbf{evento} è un \textbf{marker all'interno di uno stream} associato a un \textbf{punto del flusso di operazioni}. Serve per controllare se l'esecuzione di uno stream ha raggiunto un dato punto o anche per la sincronizzazione inter-stream. Permettono controllo e sincronizzazione tra stream.\\
+
+Può essere usato per due scopi base:
+\begin{itemize}
+	\item Sincronizzare l'esecuzione di stream
+	\item Monitorare il progresso del device
+\end{itemize}
+
+Le API CUDA forniscono funzioni che consentono di inserire eventi in qualsiasi punto dello stream. Oppure effettuare delle query per sapere se lo stream è stato completato. \\
+
+Eventi sullo stream di default sincronizzano con tutte le precedenti operazioni su tutti gli stream.\\
+
+Creazione:
+\begin{minted}{c}
+cudaEvent_t event;
+cudaError_t cudaEventCreate(cudaEvent_t* event);
+\end{minted}
+Crea un nuovo evento di nome \texttt{event}.\\
+
+Gli eventi nello stream zero vengono completati dopo che tutti i precedenti comandi in tutti gli stream sono stati completati. Ogni evento ha uno stato booleano: occorso/non occorso.\\
+
+Per distruggerlo
+\begin{minted}{c}
+cudaError_t cudaEventDestroy(cudaEvent_t event);
+\end{minted}
+Completa il rilascio di risorse.\\
+
+Per usarli, si registra un evento su uno stream:
+\begin{minted}{c}
+cudaError_t cudaEventRecord(
+	cudaEvent_t event, cudaStream_t stream);
+\end{minted}
+
+Poi si possono usare altre funzioni per:
+\begin{itemize}
+	\item sincronizzare l'host rispetto all'evento, bloccarlo finché non si verifica l'evento
+	\begin{minted}{c}
+cudaError_t cudaEventSynchronize(cudaEvent_t event);
+	\end{minted}
+	\item controllare l'avvenimento di un evento, senza bloccare
+	\begin{minted}{c}
+cudaError_t cudaEventQuery(cudaEvent_t event);
+	\end{minted}
+	\item far attendere uno stream sull'occorrenza dell'evento su un altro stream
+	\begin{minted}{c}
+cudaError_t cudaStreamWaitEvent(
+	cudaStream_t stream , cudaEvent_t event);
+	\end{minted}
+\end{itemize}
+
+\newpage
+
+\paragraph{Sincronizzazione Esplicita:} CUDA runtime supporta diversi modi di sincronizzazione esplicita a livello di grid in un programma CUDA, si può sincronizzare rispetto
+\begin{itemize}
+	\item al device
+	\item ad uno stream
+	\item a un evento all'interno di uno stream
+	\item a diversi stream (tra loro), usando un evento
+\end{itemize}
+
+Si può bloccare l'host fino a che il device non abbia completato i task precedenti:
+\begin{minted}{c}
+cudaError_t cudaDeviceSynchronize(void);
+\end{minted}
+
+Si può bloccare l'host fino a che tutte le operazioni in uno stream siano state completate (\texttt{cudaStreamSynchronize}) oppure eseguire un test non-bloccante (\texttt{cudaStreamQuery}):
+\begin{minted}{c}
+cudaError_t cudaStreamSynchronize(cudaStream_t stream);
+cudaError_t cudaStreamQuery(cudaStream_t stream);
+\end{minted}
+
+Un CUDA event può anche essere usato per sincronizzare host e device:
+\begin{minted}{c}
+cudaError_t cudaEventSynchronize(cudaEvent_t event);
+cudaError_t cudaEventQuery(cudaEvent_t event);
+\end{minted}
+
+%End L8
