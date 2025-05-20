@@ -1,53 +1,65 @@
 % !TeX spellcheck = it_IT
 \section{Modelli per sistemi paralleli}
-Un \textbf{modello di programmazione parallela} rappresenta un'\textbf{astrazione} per un sistema di calcolo parallelo in cui è conveniente esprimere algoritmi concorrenti/paralleli. \\
+Un \textbf{modello di programmazione parallela} rappresenta un'\textbf{astrazione} per un sistema di calcolo parallelo in cui è conveniente esprimere algoritmi concorrenti/paralleli.
 
 Si possono avere diversi livelli di astrazione: 
 \begin{itemize}
 	\item \textbf{Modello macchina}: livello più basso che descrive l'hardware e il sistema operativo (registri, memoria, I/O); il linguaggio assembly è basato su questo livello di astrazione
+	
 	\item \textbf{Modello architetturale}: rete di interconnessione di piattaforme parallele, organizzazione della memoria e livelli di sincronizzazione tra processi, modalità di esecuzione delle istruzioni di tipo SIMD o MIMD
-	\item Modello computazionale: modello formale di macchina che fornisce metodi analitici per fare predizioni teoriche sulle prestazioni (in base a tempo, uso delle risorse, …). Per esempio il modello RAM descrive il comportamento del modello architetturale di Von Neumann (processore, memoria, operazioni, …) Il modello PRAM estende RAM per architetture parallele
+	
+	\item \textbf{Modello computazionale}: modello formale di macchina che fornisce metodi analitici per fare predizioni teoriche sulle prestazioni (in base a tempo, uso delle risorse, \dots). Per esempio il modello RAM descrive il comportamento del modello architetturale di Von Neumann (processore, memoria, operazioni, \dots) Il modello PRAM estende RAM per architetture parallele
 \end{itemize}
 
 \subsection{Modello PRAM}
-Si tratta del più semplice modello di calcolo parallelo: \textbf{memoria condivisa}, $n$ processori, la memoria permette scambiare facilmente valori tra i processori.\\
+Si tratta del più semplice modello di calcolo parallelo: \textbf{memoria condivisa}, $n$ processori; la memoria gestita in questo modo permette di scambiare facilmente valori tra i processori.
 
-Il calcolo procede per passi: ad ogni passo ogni processore può fare una operazione sui dati con possesso esclusivo; può leggere o scrivere nella memoria condivisa. Si può selezionare un insieme di processori che eseguono tutti la stessa istruzione (su dati generalmente diversi - \textbf{SIMD}). Gli altri processori restano inattivi; i processori attivi sono sincronizzati (eseguono la stessa istruzione simultaneamente).\\
+Il calcolo procede per passi: ad ogni passo ogni processore può fare una operazione sui dati con possesso esclusivo; leggere o scrivere nella memoria condivisa. Si può selezionare un insieme di processori che eseguono tutti la stessa istruzione (su dati generalmente diversi - \textbf{SIMD}). Gli altri processori restano inattivi; i processori attivi sono sincronizzati (eseguono la stessa istruzione simultaneamente).
 
-\paragraph{SIMD:} I modelli SIMD sono basati su unità funzionali contenute in processori general purpose. Le ALU SIMD possono effettuare operazioni multiple simultaneamente in un ciclo di clock. Usano registri che effettuano \texttt{load} e \texttt{store} di molteplici elementi di dati in una sola transizione. La popolarità SIMD deriva dall'uso esplicito di linguaggi di programmazione parallela sfruttando il parallelismo dei dati.\\
-Permette di semplificare il controllo in quanto univoco.\\
+\paragraph{SIMD:} I modelli SIMD sono basati su unità funzionali contenute in processori general purpose. Le ALU SIMD possono effettuare operazioni multiple simultaneamente in un ciclo di clock. Usano registri che effettuano \texttt{load} e \texttt{store} di molteplici elementi in una sola transazione. La popolarità del modello SIMD deriva dall'uso esplicito di linguaggi di programmazione parallela sfruttando il parallelismo dei dati. Permette di semplificare il controllo in quanto univoco.
 
-\paragraph{Modello di programmazione parallela:} Specifica la "vista" del programmatore del computer parallelo, definendo come si possa codificare un algoritmo
+\paragraph{Modello di programmazione parallela:} Specifica la "vista" del programmatore sul computer parallelo, definendo come si possa codificare un algoritmo; al suo interno
 \begin{itemize}
 	\item Comprende la \textbf{semantica} del linguaggio di programmazione, librerie, compilatore, tool di profiling
-	\item Dice di che \textbf{tipo} sono le c\textbf{omputazioni parallele} (instruction level, procedural level o parallel loops)
-	\item Permette di dare \textbf{specifiche implicite} o \textbf{esplicite} (da parte utente) per il parallelismo
+	
+	\item Dice di che \textbf{tipo} sono le \textbf{computazioni parallele} (instruction level, procedural level o parallel loops)
+	
+	\item Permette di dare \textbf{specifiche implicite} o \textbf{esplicite} (da parte dell'utente) per il parallelismo
+	
 	\item Modalità di \textbf{comunicazione tra unità di computazione} per lo scambio di informazioni (shared variable)
+	
 	\item Meccanismi di \textbf{sincronizzazione} per gestire computazioni e comunicazioni tra diverse unità che operano in parallelo
+	
 	\item Molti forniscono il concetto di \textbf{parallel loop} (iterazioni indipendenti), altri di \textbf{parallel task} (moduli assegnati a processori distinti eseguiti in parallelo)
+	
 	\item Un \textbf{programma parallelo} è eseguito da processori in un ambiente parallelo tale che in ogni processore si ha uno o più flussi di esecuzione, quest'ultimi sono detti processi o thread
+	
 	\item Ha una \textbf{organizzazione dello spazio di indirizzamento}: per esempio, distribuito (no variabili shared quindi uso del message passing) o condiviso (uso di variabili shared per lo scambio di informazioni
 \end{itemize}
 
-%s8 controlla, boh cazzo ne so
-
 \subsection{Processi UNIX}
-Con "processo" si definisce un programma in esecuzione con diverse risorse allocate (stack, heap, registri, \dots). Un processo con un solo thread può eseguire una sola attività alla volta, se ci sono più processi in esecuzione è necessario alternali e di conseguenza avere un context switch (costoso, gestito dal sistema operativo). I processi possono essere creati a runtime.\\
 
-\paragraph{Thread Unix:} Un thread (su CPU) è una estensione del modello di processo (lightweight process perché possiedono un contesto più snello rispetto ai processi). Si tratta di un flusso di istruzioni di un programma e viene schedulato come unità indipendente nelle code di esecuzione dei processi della CPU (scheduler).\\
-Condivide lo spazio di indirizzamento con gli altri thread del processo: rappresentato da un thread control block (TCB) che punta al PCB del processo contenitore. Dal punto di vista del programmatore, l’esecuzione del thread è sequenziale, quindi un'istruzione eseguita alla volta, con un puntatore alla prossima istruzione da eseguire e verificando costantemente l’accesso ai dati.\\
-Vi sono meccanismi di sincronizzazione tra thread per evitare race conditon (accesso a variabili condivise o in generale comportamenti non deterministici).\\
+Con "\textbf{processo}" si definisce un programma in esecuzione con diverse risorse allocate (stack, heap, registri, \dots). Un processo con un solo thread può eseguire una sola attività alla volta, se ci sono più processi in esecuzione è necessario alternarli e di conseguenza avere un context switch (costoso, gestito dal sistema operativo). I processi possono essere creati a runtime.
 
-Ogni processo ha il proprio contesto ed è pensato per eseguire codice sequenzialmente; l'astrazione dei thread vuole consentire di eseguire procedure concorrentemente. Ciascuna procedura eseguita in parallelo sarà un thread.\\
-Un thread è quindi un singolo flusso di istruzioni, con le strutture dati necessarie per realizzare il proprio flusso di controllo. Una procedura che lavora in parallelo con le altre.\\
+\paragraph{Thread Unix:} Un thread (su CPU) è una estensione del modello di processo (\textit{lightweight process} perché possiedono un contesto più snello rispetto ai processi). Si tratta di un flusso di istruzioni di un programma e viene schedulato come unità indipendente nelle code di esecuzione dei processi della CPU (scheduler).
+
+Condivide lo spazio di indirizzamento con gli altri thread del processo: rappresentato da un thread control block (TCB) che punta al PCB del processo contenitore. Dal punto di vista del programmatore, l'esecuzione del thread è sequenziale, quindi un'istruzione eseguita alla volta, con un puntatore alla prossima istruzione da eseguire e verificando costantemente l'accesso ai dati.
+
+Esistono meccanismi di sincronizzazione tra thread per evitare race condition (accesso a variabili condivise o in generale comportamenti non deterministici).
+
+Ogni processo ha il proprio contesto ed è pensato per eseguire codice sequenzialmente; l'astrazione dei thread vuole consentire di eseguire procedure in maniera concorrente. Ciascuna procedura eseguita in parallelo sarà un thread.
+
+Un thread è quindi un singolo flusso di istruzioni, con le strutture dati necessarie per realizzare il proprio flusso di controllo. Una procedura che lavora in parallelo con le altre.
 
 \paragraph{Stati di un thread:} Gli stati di un thread possono essere:
 \begin{itemize}
 	\item \textbf{Newly generated}: il thread è stato generato e non ha ancora eseguito operazioni
+	
 	\item \textbf{Executable}: il thread è pronto per l'esecuzione, ma al momento non è assegnato a nessuna unità di calcolo
-	\item Running: il thread è in esecuzione
-	\item Waiting: il thread è in attesa di un evento esterno (es. I/O) quindi non può andare in esecuzione fino a che l'evento non si verifica
-	\item Finished: il thread ha terminato tutte le operazioni
+	
+	\item \textbf{Running}: il thread è in esecuzione
+	
+	\item \textbf{Waiting}: il thread è in attesa di un evento esterno (es. I/O) quindi non può andare in esecuzione fino a che l'evento non si verifica
+	
+	\item \textbf{Finished}: il thread ha terminato tutte le operazioni
 \end{itemize}
-
-\newpage
