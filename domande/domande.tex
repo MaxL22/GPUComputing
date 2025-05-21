@@ -1,0 +1,139 @@
+% !TeX spellcheck = it_IT
+\documentclass[12pt, answers]{exam}
+\usepackage[italian]{babel}
+
+\usepackage{xcolor}
+\definecolor{bg}{rgb}{0.95,0.95,0.95}
+\definecolor{g}{rgb}{0,0.5,0.1}
+\usepackage{minted}
+\setminted[c]{bgcolor=bg}
+\setminted[python]{linenos, bgcolor=bg}
+\setminted[java]{bgcolor=bg}
+
+% TODO: Domande trovate (fuori da Notion)
+%- 
+%- Come si distingue SIMT di CUDA da SIMD. Fare un esempio in cui CUDA si comporta in maniera SIMD
+%-meccanismi di sincronizzazione tra gpu e modalità di trasmissione tra queste
+%-spiegare la warp divergence e come ovviarla nel caso della reduction
+%-mostrare l'architettura di un sm
+%-quali sono i livelli di sincronizzazione
+%-spiegare la bitonic merge network
+%-mostrare il pseudo codice dell'algoritmo di boruvka
+%-come usare la shared per le convoluzioni
+%- Fare uno schema di una BFS parallela
+%- Fare uno schema di un bitonic merge network
+%- Parallelismo dinamico
+%- Modalità di accesso alla device memory e performance
+%- Memorie statiche e dinamiche
+%- Pseudocodice utilizzo di curand per simulare il lancio di N dadi
+%- Sincronizzazione tra più devices che condividono lo stesso bus
+%- spiegare i diversi tipi di stream
+%- Ciclo di vita dei thread e organizzazione gerarchica
+%- Sincronizzazione a due livelli di CUDA
+%- Significato e uso della memoria unificata
+%- Esempio e vantaggi di loop unrolling
+%- cos'è la scalabilità, come vengono misurati i tempi e lo speedup
+%- cos'è la divergenza e qual è la sua relazione con la sincronizzazione a livello di blocco
+%- cosa sono i warp in simt e qual è la loro utilità
+%- significato e utilità di pattern di accesso alla memoria globale
+%- pseudocodice del trasferimento in memoria shared per il prodotto matriciale 
+%- pseudocodice di jones-plassman per la colorazione parallela
+%- uso degli stream per il prodotto di matrici diagonali a blocchi
+%- schema di uso per la libreria cublas
+%- schema per l'implementazione work efficient della prefix sum
+%- cosa sono le memorie pinned, zero copy e unified
+%- schema di utilizzo di più gpu, ad esempio per la somma di due vettori
+%- cosa sono le operazioni atomiche e come vengono usate per il calcolo dell'istogramma di immagini RGB
+
+\begin{document}
+\section*{GPU Computing}
+
+\begin{questions}
+    
+    \question Quali sono i meccanismi di sincronizzazione?
+    \begin{solution}
+        Si possono avere più \textbf{livelli di sincronizzazione}:
+        % 
+        \begin{itemize}
+            \item \textbf{Livello di sistema}: per attendere che un dato task venga completato su host e device; la primitiva
+            \begin{minted}{c}
+cudaError_t cudaDeviceSynchronize(void);
+            \end{minted}
+            blocca l'applicazione host finché tutte le operazioni CUDA su tutti gli stream non sono completate. Si tratta di una funzione host-side only (una volta usata lato device per gestire il parallelismo dinamico, ma ora deprecata);
+            
+            \item Non c'è una primitiva esplicita per la sincronizzazione a \textbf{livello di grid}, ma la si può ottenere (da CC 6 in avanti) lanciando un kernel cooperativo
+            \begin{minted}{c}
+cudaLaunchCooperativeKernel(
+    (void*)myKernel,
+    gridDim, blockDim,
+    kernelArgs, /*sharedMemBytes=*/0, /*stream=*/0);
+            \end{minted}
+            e all'interno del kernel
+            \begin{minted}{c}
+grid_group grid = this_grid();
+// work work work ...
+// waits for _all_ blocks in *this* kernel
+grid.sync();
+            \end{minted}
+            Non ci devono essere ulteriori kernel attivi all'interno del device;
+            
+            \item \textbf{Livello di blocco}: per attendere che tutti i thread in un blocco raggiungano lo stesso punto di esecuzione. La primitiva
+            \begin{minted}{c}
+__device__ void __syncthreads(void);
+            \end{minted}
+            impone a tutti i thread nel blocco corrente di attendere fino a quando tutti gli altri thread dello stesso blocco non hanno raggiunto quel particolare punto di esecuzione. Lo scopo principale è garantire la visibilità degli accessi alla memoria (rendere visibile le modifiche), in modo da evitare conflitti e race conditions. Se non tutti i thread all'interno del blocco arrivano alla primitiva si può avere un deadlock;
+            
+            \item \textbf{Livello di warp}: per attendere che tutti i thread all'interno di un warp raggiungano lo stesso punto di esecuzione. La primitiva
+            \begin{minted}{c}
+__device__ void __syncwarp(mask);
+            \end{minted}
+            permette di avere una barriera esplicita per garantire la ri-convergenza del warp per le istruzioni successive. L'argomento \texttt{mask} è composto da una sequenza di 32 bit che permette di definire quali warp partecipano alla sincronizzazione (se omessa, di default tutti, ovvero \texttt{0xFFFFFFFF}).
+        \end{itemize}
+        
+        Sincronizzazione \textbf{tramite stream}: tra stream non-NULL diversi non si ha nessuna dipendenza od ordinamento, mentre lo stream di default (\texttt{0}) ha un comportamento diverso, può essere: 
+        \begin{itemize}
+            \item legacy: bloccante rispetto a tutti gli altri stream, un'operazione lanciata nel default stream non può iniziare finché non sono completate tutte le operazioni precedenti in qualsiasi altro stream (e viceversa);
+            
+            \item per-thread: disponibile da CUDA 7, ogni thread host ottiene il suo default stream, diventa non-bloccante rispetto agli altri stream
+        \end{itemize}
+        
+        Sincronizzazione \textbf{tramite eventi}: all'interno degli stream si possono creare degli eventi tramite i quali è possibile avere anche sincronizzazione:
+        \begin{itemize}
+            \item Host-side: la primitiva
+            \begin{minted}{c}
+cudaError_t cudaEventSynchronize(cudaEvent_t event);
+            \end{minted}
+            permette di attendere lato host finché l'evento specificato non viene completato; esiste una variante non-bloccante:
+            \begin{minted}{c}
+cudaError_t cudaEventQuery(cudaEvent_t event)
+            \end{minted}
+            che permette di controllare se un evento è stato completato o meno, senza bloccare l'host;
+            
+            \item Stream-to-stream: per far attendere a uno stream il completamente di un evento su un altro stream. La primitiva:
+            \begin{minted}{c}
+cudaError_t cudaStreamWaitEvent(
+    cudaStream_t stream , cudaEvent_t event);
+            \end{minted}
+            permette di aspettare un evento su un altro stream (anche su altri device).
+        \end{itemize}
+        
+        Sincronizzazione \textbf{implicita} dovuta a operazioni bloccanti: alcune operazioni causano sincronizzazione in quanto implicano un blocco su tutte le operazioni precedenti sul device corrente. In questo gruppo rientrano molte operazioni relative alla gestione della memoria.
+        
+        %Ignorerà le primitive di sincronizzazione dei cooperative groups, non spiegate?
+    \end{solution}
+    
+    \question Cosa sono local e constant memory?
+    \begin{solution}
+        In CUDA è presente una gerarchia di memorie, con diversi tipi di memoria al suo interno, ciascuno con dimensioni, banda e scopi specifici. 
+        
+        %TODO
+        Local e constant memory sono due tipi di memoria programmabile esposti al programmatore: 
+        \begin{itemize}
+            \item \textbf{Memoria locale}:
+            
+            \item \textbf{Memoria costante}:
+        \end{itemize}
+    \end{solution}
+\end{questions}
+
+\end{document}
