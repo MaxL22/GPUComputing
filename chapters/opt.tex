@@ -3,77 +3,80 @@
 
 \subsection{Risorse Hardware}
 
-\paragraph{Device Query:} Per indagare le feature disponibili sul device, scoprire le proprietà. Ad esempio: quanti SM sono disponibili, quanta memoria, \dots\\
+\paragraph{Device Query:} Per indagare le feature disponibili sul device, scoprire le proprietà. Ad esempio: quanti SM sono disponibili, quanta memoria, \dots
 
-Per farlo ci sono \href{http://docs.nvidia.com/cuda/cuda-runtime-api}{\texttt{Funzioni delle API runtime di CUDA}} e la CLI utility \href{https://developer.nvidia.com/nvidia-system-management-interface}{\texttt{nvidia-smi}}. Quest'ultimo permette di gestire e monitorare le GPU presenti.\\
+Per farlo ci sono \href{http://docs.nvidia.com/cuda/cuda-runtime-api}{\texttt{Funzioni delle API runtime di CUDA}} e la CLI utility \href{https://developer.nvidia.com/nvidia-system-management-interface}{\texttt{nvidia-smi}}. Quest'ultimo permette di gestire e monitorare le GPU presenti.
 
 Le funzioni: 
-\begin{center}
-	\texttt{cudaError\_t cudaGetDeviceCount(\&dev\_count)} \\
-	\texttt{cudaError\_t cudaGetDeviceProperties(cudaDeviceProp* prop, int device);}
-\end{center}
-Indaga il numero di device disponibili sul sistema e restituisce le proprietà del device nella struttura \texttt{cudaDeviceProp} (rispettivamente).\\
+\begin{minted}{c}
+cudaError_t cudaGetDeviceCount(&dev_count)
+cudaError_t cudaGetDeviceProperties(cudaDeviceProp* prop,
+	int device);
+\end{minted}
+Permettono di indagare il numero di device disponibili sul sistema e restituire le proprietà del device nella struttura \texttt{cudaDeviceProp} (rispettivamente).
 
-%TODO
 \subsection{Gestione ottimizzata delle risorse}
 
 L'ottimizzazione delle performance si basa su 4 strategie principali:
 \begin{itemize}
 	\item massimizzare l'utilizzazione tramite massimo parallelismo
+	
 	\item ottimizzare l'utilizzo di memoria per avere il throughput di memoria massimo
+	
 	\item ottimizzare l'uso di istruzioni per avere il massimo throughput
+	
 	\item minimizzare il memory thrashing
 \end{itemize}
 
-Che strategie permettono di ottenere le migliori performance per una determinata applicazione dipende da qual'è il fattore limitante all'interno dell'applicazione stessa. Gli sforzi per l'ottimizzazione vanno quindi costantemente direzionati monitorando i fattori che limitano le performance, tramite strumenti come il CUDA profiler. \\
+Che strategie permettono di ottenere le migliori performance per una determinata applicazione dipende da qual'è il fattore limitante all'interno della stessa. Gli sforzi per l'ottimizzazione vanno quindi costantemente direzionati monitorando i fattori che limitano le performance, tramite strumenti come il CUDA profiler.
 
-\newpage
+\paragraph{Register spilling:} Il massimo numero di registri per thread può essere definito manualmente compile time con l'opzione \texttt{-maxrregcount} e si può indagare (sempre compile time) con \texttt{--ptxas-options=-v}.
 
-\paragraph{Register spilling:} Il massimo numero di registri per thread può essere definito manualmente compile time con l'opzione \texttt{-maxrregcount} e si può indagare (sempre compile time) con \texttt{--ptxas-options=-v}. \\
-Limitare il numero porta a fare spilling (quindi usare la memoria locale), ma aumentando il numero di blocchi concorrenti. \\ %(maybe)
+Limitare il numero porta a fare spilling (quindi usare la memoria locale), ma permette di aumentare il numero di blocchi in esecuzione concorrentemente.
 
 \subsection{Profiling}
 
-Nvidia mette a disposizione dei \textbf{developer tools} per effettuare profiling e monitorare le applicazioni. \\
+Nvidia mette a disposizione dei \textbf{developer tools} per effettuare profiling e monitorare le applicazioni.
 
-\paragraph{Nsight Compute:} Profiler di livello kernel che fornisce informazioni dettagliate sulle metriche di esecuzione dei kernel CUDA. Permette una misurazione dettagliata delle prestazioni dei kernel (latency, throughput, utilizzo delle risorse, ecc.), analisi delle performance a livello di istruzione e accesso alla memoria, supporto per personalizzare la raccolta di metriche e approfondire l’ottimizzazione delle singole funzioni CUDA. \texttt{ncu, ncu-ui}, CLI e GUI.\\
+\paragraph{Nsight Compute:} Profiler di livello kernel che fornisce informazioni dettagliate sulle metriche di esecuzione dei kernel CUDA. Permette una misurazione dettagliata delle prestazioni dei kernel (latency, throughput, utilizzo delle risorse, ecc.), analisi delle performance a livello di istruzione e accesso alla memoria, supporto per personalizzare la raccolta di metriche e approfondire l’ottimizzazione delle singole funzioni CUDA. \texttt{ncu, ncu-ui}, CLI e GUI.
 
-\paragraph{Nsight Systems:} Offre un'analisi a livello di sistema, ideale per identificare bottleneck nell'interazione tra CPU e GPU. Fornisce una visione d’insieme dell'intero flusso applicativo, monitorando la sincronizzazione tra processi e thread, il trasferimento dei dati e l'esecuzione complessiva. Permette di analizzare come le attività CUDA si integrino con il resto dell'applicazione, evidenziando le possibili ottimizzazioni per bilanciare meglio l’utilizzo di tutte le risorse hardware. \texttt{nsys, nsys-ui}, CLI e GUI.\\
+\paragraph{Nsight Systems:} Offre un'analisi a livello di sistema, ideale per identificare bottleneck nell'interazione tra CPU e GPU. Fornisce una visione d'insieme dell'intero flusso applicativo, monitorando la sincronizzazione tra processi e thread, il trasferimento dei dati e l'esecuzione complessiva. Permette di analizzare come le attività CUDA si integrino con il resto dell'applicazione, evidenziando le possibili ottimizzazioni per bilanciare meglio l'utilizzo di tutte le risorse hardware. \texttt{nsys, nsys-ui}, CLI e GUI.
 
-\newpage
-
-%back to main slides
 \subsection{Loop Unrolling}
-Il loop unrolling può essere utile per ottimizzare i cicli: questi vengono espansi ("srotolati") in modo da ridurre l'effettivo numero di iterazioni necessarie durante l'esecuzione del kernel. Il corpo del ciclo viene riscritto più volte. \\
+Il loop unrolling può essere utile per ottimizzare i cicli: questi vengono espansi ("srotolati") in modo da ridurre l'effettivo numero di iterazioni necessarie durante l'esecuzione del kernel. Il corpo del ciclo viene riscritto più volte. 
 
 Questo ha diversi vantaggi, tra cui: 
 \begin{itemize}
 	\item riduzione dell'overhead dovuto ai controlli del ciclo
+	
 	\item eliminazione di salti e riduzione della logica di controllo 
+	
 	\item aumento del livello di parallelismo
 \end{itemize}
 
-Il numero di copie del corpo del loop create si chiama \textbf{unrolling factor} (quanto è stato "srotolato" il ciclo). Questa tecnica è efficace quando il numero di iterazioni è noto a priori.\\
+Il numero di copie del corpo del loop create si chiama \textbf{unrolling factor} (quanto è stato "srotolato" il ciclo). Questa tecnica è efficace quando il numero di iterazioni è noto a priori.
 
-\paragraph{Warp unrolling:} L'ottimizzazione si può anche migliorare sfruttando il concetto di warp. Tutti i 32 thread all'interno di un solo warp eseguono lo stesso codice in maniera sincrona, si usa questa caratteristica per unrollare il codice di un ciclo in maniera esplicita, eliminando controlli ed eventuali divergenze tra thread. Dato che tutti gli warp eseguono lo stesso codice, l'unrolling garantisce che il flusso di esecuzione rimanga uniforme, riducendo la divergenza (percorsi di codice differenti all'interno del medesimo warp). \\
+\paragraph{Warp unrolling:} L'ottimizzazione si può anche migliorare sfruttando il concetto di warp. Tutti i 32 thread all'interno di un solo warp eseguono lo stesso codice in maniera sincrona, si usa questa caratteristica per unrollare il codice di un ciclo in maniera esplicita, eliminando controlli ed eventuali divergenze tra thread. 
+
+Dato che tutti gli warp eseguono lo stesso codice, l'unrolling garantisce che il flusso di esecuzione rimanga uniforme, riducendo la divergenza. 
 
 % End L6
 
 \subsection{Parallelismo dinamico}
 
-Ci siamo mai chiesti se si può lanciare un kernel all'interno di un kernel? Not really, ma potrebbe essere utile (come ad esempio per la ricorsione). Nuova feature introdotta dalle CC 3.5: ogni kernel può lanciare un altro kernel e gestire dipendenze inter-kernel. Elimina la necessità di comunicare con la CPU, rende più semplice creare e ottimizzare pattern di esecuzione ricorsivi e data-dependent. Senza parallelismo dinamico la CPU deve lanciare ogni kernel.\\
+Ci siamo mai chiesti se si può lanciare un kernel all'interno di un kernel? Not really, ma potrebbe essere utile (come ad esempio per la ricorsione). Nuova feature introdotta dalle CC 3.5: ogni kernel può lanciare un altro kernel e gestire dipendenze inter-kernel. 
 
-L'idea dietro il parallelismo dinamico è generare dinamicamente kernel in base ai dati: se ci sono elementi diversi/zone della matrice di lavoro che richiedono sforzi diversi possiamo fare in modo che i kernel sian \textit{ad hoc} per migliorare l'efficienza.\\
+Elimina la necessità di comunicare con la CPU, rende più semplice creare e ottimizzare pattern di esecuzione ricorsivi e data-dependent. Senza parallelismo dinamico la CPU deve occuparsi di lanciare ogni kernel.
 
-%Esempio: Mandelbrot %Ci saranno le slide, forse, da qualche parte
+L'idea dietro il parallelismo dinamico è generare dinamicamente kernel in base ai dati: se ci sono elementi diversi/zone della matrice di lavoro che richiedono sforzi diversi possiamo fare in modo che i kernel siano \textit{ad hoc} per migliorare l'efficienza.
 
-Senza permettere al kernel di lanciare altri kernel il modello di esecuzione è inefficiente: la CPU non può essere conscia dei dati, ma è lei che deve lanciare \textit{tutti} i kernel, la GPU valuta se è necessario lanciare nuovi kernel (in base ai dati) e tali informazioni vanno passate nuovamente alla CPU per lanciare nuovi kernel.\\
+Senza permettere al kernel di lanciare altri kernel il modello di esecuzione è inefficiente: la CPU non può essere conscia dei dati, ma è lei che deve lanciare \textit{tutti} i kernel. In questo modo la GPU può valutare se è necessario lanciare nuovi kernel (in base ai dati) e tali informazioni vanno passate nuovamente alla CPU per lanciare nuovi kernel.
 
-La soluzione è il \textbf{parallelismo dinamico}: la GPU può lanciare nuovi kernel, permette di ridurre la dipendenza dalla CPU e migliorare il throughput del kernel (se fatto bene). Consente carichi di lavoro dinamici senza penalizzare le prestazioni.\\
+La soluzione è il \textbf{parallelismo dinamico}: la GPU può lanciare nuovi kernel, permettendo di ridurre la dipendenza dalla CPU e migliorare il throughput del kernel (se fatto bene). Consente carichi di lavoro dinamici senza penalizzare le prestazioni.
 
-Vogliamo mettere carico di lavoro dove serve, scegliere la granularità del lavoro in base ai dati. Possiamo posporre la decisione delle dimensioni di blocchi e griglia fino a runtime. Possiamo adattare il lavoro in base a \textbf{decisioni data-driven}, non da schemi fissi come visto fino ad ora.\\
+Vogliamo mettere carico di lavoro dove serve e scegliere la granularità del lavoro in base ai dati. Possiamo posporre la decisione delle dimensioni di blocchi e griglia fino a runtime. Possiamo adattare il lavoro in base a \textbf{decisioni data-driven}, non da schemi fissi come visto fino ad ora.
 
-Esempio: un kernel figlio viene chiamato all'interno di un kernel padre e quest'ultimo può utilizzare i risultati prodotti dal figli senza nessuna interazione da parte della CPU
+Esempio: un kernel figlio viene chiamato all'interno di un kernel padre e quest'ultimo può utilizzare i risultati prodotti dal figlio senza nessuna interazione da parte della CPU
 \begin{minted}{c}
 __global__ ChildKernel(void* data) {
 	//Operate on data
@@ -85,14 +88,13 @@ __global__ ParentKernel(void* data) {
 ParentKernel<<<256, 64>>(data);
 \end{minted}
 
-Sarebbe da limitare un attimo l'annidamento: se ogni thread facesse una chiamata a kernel figlio \textit{potrebbero} diventare tanti kernel lanciati; sarebbe carino inserire \textbf{control flow attorno ai lanci}, per esempio limitando il lancio ad 1 per blocco del padre (\texttt{threadIdx.x == 0}).\\
+Sarebbe da limitare un attimo l'annidamento: se ogni thread facesse una chiamata a kernel figlio \textit{potrebbero} diventare tanti kernel lanciati; sarebbe carino inserire \textbf{control flow attorno ai lanci}, per esempio limitando il lancio ad 1 per blocco del padre (\texttt{threadIdx.x == 0}).
 
-\paragraph{Sincronizzazione:} Si ha una sincronizzazione implicita, il padre non può terminare prima dei figlio, un kernel non è considerato completato finché ha figli attivi. Rimane la possibilità di avere sincronizzazione esplicita, altrimenti il kernel padre non ha garanzie di poter vedere i dati elaborati dal figlio. \\
-
-%Slide 7
+\paragraph{Sincronizzazione:} Si ha una \textbf{sincronizzazione implicita}, il padre non può terminare prima dei figlio, un kernel non è considerato completato finché ha figli attivi. Rimane la possibilità di avere sincronizzazione esplicita, altrimenti il kernel padre non ha garanzie di poter vedere i dati elaborati dal figlio.
 
 \subsection{Librerie CUDA}
-Le librerie sono comode e quelle CUDA sono accelerate dalla GPU. Le API di molte di queste sono volutamente simili a quelle della libreria standard. Permettono porting di codice da sequenziale a parallelo con \textit{minimo sforzo}, nessun tempo di mantenimento della libreria.\\
+
+Le librerie sono comode e quelle CUDA sono accelerate dalla GPU. Le API di molte di queste sono volutamente simili a quelle della libreria standard. Permettono porting di codice da sequenziale a parallelo con \textit{minimo sforzo}, nessun tempo di mantenimento della libreria.
 
 Esempi di librerie CUDA:
 \begin{center}
@@ -114,12 +116,19 @@ Esempi di librerie CUDA:
 \paragraph{Workflow tipico:} Per l'utilizzo di una libreria CUDA, il workflow generico è:
 \begin{enumerate}
 	\item Creare un \textbf{handle} specifico della libreria (per la gestione delle informazioni e relativo contesto in cui essa opera, es. uso degli stream)
+	
 	\item \textbf{Allocare la device memory} per gli input e output alle funzioni della libreria (convertirli al formato specifico di uso della liberia, es. converti array 2D in column-major order)
+	
 	\item \textbf{Popolare con i dati} nel formato specifico
+	
 	\item \textbf{Configurare} le computazioni per l'esecuzione (es. dimensione dei dati)
+	
 	\item Eseguire la \textbf{chiamata della funzione} di libreria che avvia la computazione sulla GPU
+	
 	\item \textbf{Recuperare i risultati} dalla device memory
+	
 	\item Se necessario, \textbf{(ri)convertire i dati} nel formato specifico o nativo dell'applicazione
+	
 	\item \textbf{Rilasciare le risorse} CUDA allocate per la data libreria
 \end{enumerate}
 
@@ -128,15 +137,20 @@ Esempi di librerie CUDA:
 Usata per calcolo scientifico ed ingegneristico per problemi di algebra lineare numerica
 \begin{itemize}
 	\item risoluzione di sistemi lineari
+	
 	\item ricerca di autovalori e/o autovettori
+	
 	\item calcolo della SVD (valori e vettori singolari)
+	
 	\item fattorizzazione di matrici
 \end{itemize}
 
 Come BLAS, le funzioni di cuBLAS sono divisi in livelli: 
 \begin{itemize}
 	\item Livello 1: per operazioni vettore-vettore
+	
 	\item Livello 2: per operazioni vettore-matrice
+	
 	\item Livello 3: per operazioni matrice-vettore
 \end{itemize}
 
@@ -154,15 +168,21 @@ $$
 \end{array}\right]
 \quad I(r,c) = c \cdot M  + r 
 $$
-Dove $(r,c)$ sono le coordinate del valore cercato e $M$ è l'altezza della matrice (dimensioni $M \times N$).\\
 
-\paragraph{Operare con cuBLAS:} L'iter tipico per usare cuBLAS è 
+Dove $(r,c)$ sono le coordinate del valore cercato e $M$ è l'altezza della matrice (dimensioni $M \times N$).
+
+\paragraph{Operare con cuBLAS:} L'iter tipico per usare cuBLAS è
 \begin{enumerate}
 	\item creare un handle con \texttt{cublasCreateHandle}
+	
 	\item allocare la memoria sul device con \texttt{cudaMalloc}
-	\item poplare la device memory con gli input necessari usando \texttt{cublasSetVector} e \texttt{cublasSetMatrix}
+	
+	\item popolare la device memory con gli input necessari usando \texttt{cublasSetVector} e \texttt{cublasSetMatrix}
+	
 	\item effettuare le chiamate di libreria necessarie
+	
 	\item recuperare i risultati dalla device memory usando \texttt{cublasGetVector} e \texttt{cublasGetMatrix}
+	
 	\item rilasciare le risorse CUDA e cuBLAS con \texttt{cudaFree} e \texttt{cublasDestroy}, rispettivamente
 \end{enumerate}
 
@@ -173,6 +193,7 @@ Dove $(r,c)$ sono le coordinate del valore cercato e $M$ è l'altezza della matr
 cublasSetVector(int n, int elemSize, const void *cpumem, 
 	int incx, void *gpumem, int incy)
 	\end{minted}
+	
 	\item L'inverso di prima (da GPU a CPU)
 	\begin{minted}{c}
 cublasGetVector(int n, int elemSize, const void *gpumem, 
@@ -188,6 +209,7 @@ cublasSetMatrix(int rows, int cols, int elemSize,
 	const void *A, int lda, void *B, int ldb)
 	\end{minted}
 	esiste anche il corrispettivo \texttt{cublasGetMatrix()} che fa l'inverso
+	
 	\item come \texttt{cublasGetMatrix()}, ma asincrono (rispetto all'host), usando il parametro \texttt{stream} fornito
 	\begin{minted}{c}
 cublasGetMatrixAsync(int rows, int cols, int elemSize, 
@@ -200,11 +222,12 @@ Per gestire la libreria serve un \textbf{handle}, il quale si può generare tram
 \begin{minted}{c}
 cublasCreate(cublasHandle_t* handle)
 \end{minted}
+
 Viene passato ad ogni chiamata di funzione della libreria successiva. Al termine
 \begin{minted}{c}
 cublasDestroy(cublasHandle_t* handle)
 \end{minted}
-per distruggerlo. Il tipo dell'handle è \texttt{cublasHandle\_t}. Esiste un tipo \texttt{cublasStatus\_t} usato per il report degli errori.\\
+per distruggerlo. Il tipo dell'handle è \texttt{cublasHandle\_t}. Esiste un tipo \texttt{cublasStatus\_t} usato per il report degli errori.
 
 Per trasferimenti device-device: copia \texttt{n} elementi da \texttt{x} a \texttt{y}:
 \begin{minted}{c}
@@ -214,16 +237,21 @@ cublasScopy(handle, n, x, incx, y, incy)
 In generale la libreria segue una naming convention \texttt{cublas<T>operation}, dove \texttt{<T>} può essere: 
 \begin{itemize}
 	\item \texttt{S} per parametri di tipo \texttt{float}
+
 	\item \texttt{D} per \texttt{double}
+
 	\item \texttt{C} per \texttt{complex  floats}
+
 	\item \texttt{Z} per \texttt{complex double}
 \end{itemize}
-Ad esempio, per l'operazione \texttt{axpy} le funzioni disponibili sono \texttt{cublasSaxpy}, \texttt{cublasDaxpy}, \texttt{cublasCaxpy}, \texttt{cublasZaxpy}.\\
+Ad esempio, per l'operazione \texttt{axpy} le funzioni disponibili sono \texttt{cublasSaxpy}, \texttt{cublasDaxpy}, \texttt{cublasCaxpy}, \texttt{cublasZaxpy}.
 
 Si usa un valore di tipo \texttt{cublasOperation\_t} per indicare operazioni su matrici all'interno di funzioni: 
 \begin{itemize}
 	\item \texttt{CUBLAS\_OP\_N} per non-transpose
+
 	\item \texttt{CUBLAS\_OP\_T} per transpose
+
 	\item \texttt{CUBLAS\_OP\_C} per conjugate transpose
 \end{itemize}
 
@@ -268,29 +296,34 @@ cublasStatus_t cublasSgemm(cublasHandle_t handle,
 	const float *beta, float *C, int ldc)
 \end{minted}
 
-\newpage
-
 \subsubsection{cuRAND}
 
 La libreria cuRAND fornisce semplici ed efficienti \textbf{generatori di numeri}. Permette sequenze: 
 \begin{itemize}
 	\item Pseudo-random: soddisfa proprietà statistiche di una vera sequenza random, ma generata da un algoritmo deterministico
+	
 	\item Quasi-random: sequenza di punti $n$-dimensionali uniformemente generati secondo un algoritmo deterministico
 \end{itemize}
 
 La libreria si compone di due parti:
 \begin{itemize}
 	\item \texttt{curand.h} per l'host
+	
 	\item \texttt{curand\_kernel.h} per il device
 \end{itemize}
 
 \paragraph{Host API:} Dalla \href{https://docs.nvidia.com/cuda/curand/index.html}{\texttt{documentazione}}, passaggi:
 \begin{enumerate}
 	\item Crea un \textbf{nuovo generatore} del tipo desiderato con \texttt{curandCreateGenerator()}
+	
 	\item Setta i \textbf{parametri} del generatore; ad esempio: \texttt{curandSetPseudoRandomGeneratorSeed()} per settare il seed
+	
 	\item Alloca la memoria device con \texttt{cudaMalloc()}
+	
 	\item Genera i valori casuali necessari con \texttt{curandGenerate()} (o altre funzioni)
+	
 	\item Usa i valori
+	
 	\item Quando non serve più il generatore va distrutto con \texttt{curandDestroyGenerator()}
 \end{enumerate}
 
@@ -313,54 +346,54 @@ curandSetRandomGeneratorSeed(g, SEED)
 curandGenerate______(…)
 	\end{minted}
 	dipende dalla distribuzione che si vuole generare, ad esempio: \texttt{curandGenerateUniform(g, src, n)} oppure \texttt{curandGenerateNormal(g, src, n, mean, stddev)}. 
+
 	\item Per distruggere il generatore
 	\begin{minted}{c}
 curandDestroyGenerator(g)
 	\end{minted}
 \end{itemize}
 
-La funzione \texttt{curandGenerate()} permette di generare valori in maniera asincrona, molto più veloce per quantità elevate di valori. Usare questa libreria richiederebbe poi di dover passare i dati generati alla GPU (\texttt{src} all'interno della funzione è un puntatore host), introducendo overhead. Per risolvere si può usare la Device API.\\
+La funzione \texttt{curandGenerate()} permette di generare valori in maniera asincrona, molto più veloce per quantità elevate di valori. Usare questa libreria richiederebbe poi di dover passare i dati generati alla GPU (\texttt{src} all'interno della funzione è un puntatore host), introducendo overhead. Per risolvere si può usare la Device API.
 
 \paragraph{Device API:} Per generare valori sul device: 
 \begin{enumerate}
 	\item Pre-allocare un set di cuRAND state objects nella device memory per ogni thread (gestiscono lo stato)
+
 	\item Opzionale, pre-allocare device memory per tenere i valori generati (se devono poi essere passati all'host o essere mantenuti per kernel successivi)
+
 	\item Inizializzare lo stato di tutti gli state objects con una kernal call
+
 	\item Chiamare una funzione cuRAND per generare valori casuali usando gli state objects allocati
+
 	\item Opzionale, trasferire i valori all'host (se è stata allocata la memoria in precedenza)
 \end{enumerate}
-
-\newpage
-
-%\subsubsection{cuFFT - Fast Fourier Transform}
-%
-%La libreria cuFFT fornisce una implementazione della \href{https://en.wikipedia.org/wiki/Fast_Fourier_transform}{\texttt{Fast Fourier Transform FFT}} (segnali dal dominio del tempo a frequenze e relativa inversa). L'input della FFT è un sampling di un segnale. La librerie permette trasformate 1D, 2D o 3D. Si basa sugli algoritmi per FFT di \href{https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm}{\texttt{Cooley-Tukey}} e \href{https://en.wikipedia.org/wiki/Chirp_Z-transform#Bluestein.27s_algorithm}{\texttt{Bluestein}}. Permette una esecuzione asincrona con valori che possono essere \texttt{rea\texttt{l}, \texttt{complex}, \texttt{float}, }double. \\
-%
-%%s63
-
-%aggiorna slied 7, algoritmo più preciso
-%Togli la FFT lib, non la spiega, non serve dai
 
 \subsection{Stream e Concorrenza}
 
 Si possono avere diversi gradi di concorrenza in CUDA: 
 \begin{itemize}
 	\item \textbf{CPU/GPU concurrency} (modello ibrido): si tratta di dispositivi distinti e operano indipendentemente
+	
 	\item \textbf{Memcpy/kernel processing concurrency}: grazie al DMA il trasferimento tra host e device può avere luogo mentre gli SM processano i kernel
+	
 	\item \textbf{Kernel concurrency}: si possono eseguire fino a 128 kernel in parallelo, anche da thread di CPU distinti
+	
 	\item \textbf{Grid-level concurrency}: uso di stream multipli per operazioni indipendenti
+	
 	\item \textbf{Multi-GPU concurrency}: si può ripartire il carico tra multiple GPU che lavorano in parallelo
 \end{itemize}
 
 \subsubsection{CUDA Streams}
 
-Uno \textbf{stream CUDA} è riferito a sequenze di operazioni CUDA asincrone eseguite dal device, nell'ordine che viene stabilito dal codice host. Queste operazioni vengono inserite in una coda FIFO (incapsulate dallo stream), per poi essere gestita dallo scheduling (devono essere serviti). Operazioni tipiche possono essere: trasferimento dati, lancio kernel, gestione eventi di sincronizzazione. L'esecuzione di operazioni in uno stream è sempre asincrona rispetto all'host.\\
+Uno \textbf{stream CUDA} è riferito a sequenze di operazioni CUDA asincrone eseguite dal device, nell'ordine che viene stabilito dal codice host. Queste operazioni vengono inserite in una coda FIFO (incapsulate dallo stream), per poi essere gestita dallo scheduling (devono essere serviti). 
 
-Le operazioni appartenenti a stream distinti non hanno restrizioni sull'ordine di esecuzione uno con l'altro (ma possono essere imposte); ogni stream è asincrono rispetto all'host e sono tutti indipendenti l'uno con l'altro.\\
+Operazioni tipiche possono essere: trasferimento dati, lancio kernel, gestione eventi di sincronizzazione. L'esecuzione di operazioni in uno stream è sempre asincrona rispetto all'host.
 
-\paragraph{Parallelismo Grid-level:} Dal punto di vista CUDA le operazioni di stream distinti vengono eseguite in parallelo (concorrentemente). I comandi immessi su uno stream possono essere eseguiti quando tutte le dipendenze del comando sono soddisfatte. Le dipendenze possono essere comandi lanciati in precedenza sullo stesso flusso o dipendenze da altri flussi; i.e., ogni stream è indipendente da tutti gli altri, idealmente vengono eseguiti tutti in parallelo. \\
+Le operazioni appartenenti a stream distinti non hanno restrizioni sull'ordine di esecuzione l'uno con l'altro (ma possono essere imposte); ogni stream è asincrono rispetto all'host e sono tutti indipendenti l'uno con l'altro.
 
-Il completamento con successo della chiamata di sincronizzazione garantisce il completamento corretto di tutti i comandi lanciati.\\
+\paragraph{Parallelismo Grid-level:} Dal punto di vista CUDA le operazioni di stream distinti vengono eseguite in parallelo (concorrentemente). I comandi immessi su uno stream possono essere eseguiti quando tutte le dipendenze del comando sono soddisfatte. Le dipendenze possono essere comandi lanciati in precedenza sullo stesso flusso o dipendenze da altri flussi; i.e., ogni stream è indipendente da tutti gli altri, idealmente vengono eseguiti tutti in parallelo.
+
+Il completamento con successo della chiamata di sincronizzazione garantisce il completamento corretto di tutti i comandi lanciati.
 
 \paragraph{Creare API Stream:} Bisogna inserire degli oggetti che si chiamano "stream". Passaggi: 
 \begin{itemize}
@@ -368,11 +401,13 @@ Il completamento con successo della chiamata di sincronizzazione garantisce il c
 	\begin{minted}{c}
 cudaError_t cudaStreamCreate(cudaStream_t* pStream );
 	\end{minted}
+	
 	\item lancio del kernel
 	\begin{minted}{c}
 kernel_name<<< grid, block, sharedMemSize, pStream >>>
 	(argument list);
 	\end{minted}
+	
 	\item eliminazione di stream:
 	\begin{minted}{c}
 cudaError_t cudaStreamDestroy(cudaStream_t pStream );
@@ -385,7 +420,8 @@ cudaError_t cudaMallocHost(void **ptr, size_t size);
 cudaError_t cudaHostAlloc(void **pHost, size_t size, 
 	unsigned int flags);
 \end{minted}
-Alloca su host memoria non paginabile (pinned memory), \texttt{flag} indica specifiche proprietà di allocazione (se 0 le due API sono uguali). In seguito, per fare \textbf{trasferimento asincrono} basato su pinned memory
+
+Alloca su host memoria non paginabile (pinned memory), \texttt{flag} indica specifiche proprietà di allocazione (se \texttt{0} le due API sono uguali). In seguito, per fare \textbf{trasferimento asincrono} basato su pinned memory
 \begin{minted}{c}
 cudaError_t cudaMemcpyAsync(void* dst, const void* src, 
 	size_t count, cudaMemcpyKind kind, 
@@ -395,79 +431,93 @@ cudaError_t cudaMemcpyAsync(void* dst, const void* src,
 \paragraph{Tipi di stream:} Le operazioni CUDA vengono eseguite esplicitamente o implicitamente su uno stream. Ne esistono di due tipi: 
 \begin{itemize}
 	\item dichiarato implicitamente (NULL stream o deault stream, si può indicare esplicitamente con \texttt{0} al posto del valore di stream nella chiamata a kernel)
+	
 	\item dichiarato esplicitamente (non-NULL stream)
 \end{itemize}
 
 Il default stream interviene quando non viene usato esplicitamente uno stream. Il comportamento in relazione agli altri stream dipende dalla flag di compilazione:
 \begin{itemize}
 	\item \texttt{--default-stream legacy} (or noflag): vecchio comportamento in cui un lancio di \texttt{cudaMemcpy} o del kernel sullo stream predefinito si blocca/sincronizza con altri stream
+	
 	\item \texttt{--default-stream per-thread}: nuovo comportamento in cui il default stream non influenza gli altri
 \end{itemize}
 
-%Default stream: %s10?
+\paragraph{Maintaining Occupancy:} La situazione ideale è avere kernel grandi che occupano completamente il device. Kernel piccoli possono occupare il device in maniera meno organizzata, portando a sequenzializzazione all'interno dello stream.
 
-\paragraph{Maintaining Occupancy:} La situazione ideale è avere kernel grandi che occupano completamente il device, mentre kernel piccoli possono occupare il device in maniera meno organizzata, portando a sequenzializzazione all'interno dello stream. Dividere su più stream i kernel "piccoli" permette di mantenere l'efficienza togliendo dei vincoli di sequenzialità che porterebbe ad una situazione di bassa occupancy.\\
+Dividere su più stream i kernel "piccoli" permette di mantenere l'efficienza togliendo dei vincoli di sequenzialità che porterebbe ad una situazione di bassa occupancy.
 
 Meglio usare stream (asincroni concorrenti) non default per:
 \begin{itemize}
 	\item sovrapporre articolate computazioni host e device
+	
 	\item sovrapporre computazioni host e trasferimento dati host-device
+	
 	\item sovrapporre trasferimento dati host-device e computazioni device
+	
 	\item computazioni concorrenti su device
 \end{itemize}
 
 Dalla Cuda Programming Guide:
 \begin{itemize}
 	\item le applicazioni gestiscono la concorrenza attraverso gli stream
+	
 	\item uno stream è una sequenza di comandi (anche da thread host diversi) eseguiti in ordine
+	
 	\item stream diversi potrebbero eseguire i comandi senza rispettare l'ordine relativo tra loro o in maniera concorrente
 \end{itemize}
 
-Insomma, l'idea è alzare un'altra volta il grado di concorrenza, non abbiamo più kernel sequenziali le cui istruzioni sono eseguite in parallelo, anche i kernel possono essere eseguiti parallelamente tra loro su stream diversi.\\
+Insomma, l'idea è alzare un'altra volta il grado di concorrenza, non abbiamo più kernel sequenziali le cui istruzioni sono eseguite in parallelo, anche i kernel possono essere eseguiti parallelamente tra loro su stream diversi.
 
 \paragraph{Overlapping behavior:} Si possono avere diversi tipi di sovrapposizioni: 
 \begin{itemize}
 	\item overlap \textbf{traferimento dati ed esecuzione kernel}: alcuni dispositivi possono avere trasferimenti asincroni da o verso la GPU concorrentemente all'esecuzione di kernel; per controllare se presente proprietà \texttt{asyncEngineCount} (non zero vuol dire supportata); la memoria host deve essere page-locked
+	
 	\item esecuzione di \textbf{kernel concorrenti}: da CC 2.x in su si possono avere multipli kernel concorrenti; si può verificare il supporto tramite la proprietà \texttt{concurrentKernels}; il numero massimo di kernel concorrenti possibili dipende dalla CC, 128 recentemente
+	
 	\item \textbf{trasferimenti dati concorrenti}: si possono sovrapporre copie da e verso il device (per i device che supportano la cosa, \texttt{asyncEngineCount} a 2); per avere sovrapposizione la memoria host coinvolta deve essere page-locked
 \end{itemize}
 
-\paragraph{Stream Synchronize:} Tutte le operazioni sono asincrone, può essere utile controllare se tutte le operazioni in uno stream sono state completate o meno.\\
+\paragraph{Stream Synchronize:} Tutte le operazioni sono asincrone, può essere utile controllare se tutte le operazioni in uno stream sono state completate o meno.
 
 Blocco dell'host sullo stream: 
 \begin{minted}{c}
 cudaError_t cudaStreamSynchronize(cudaStream_t stream);
 \end{minted}
-Forza il blocco dell'host fino a che tutte le operazioni dello steram sono state completate. Da notare che \texttt{cudaDeviceSynchronize()} blocca l'host finché non sono stati completati tutti i comandi su tutti gli stream.\\
+
+Forza il blocco dell'host fino a che tutte le operazioni dello stream sono state completate. Da notare che \texttt{cudaDeviceSynchronize()} blocca l'host finché non sono stati completati tutti i comandi su tutti gli stream.
 
 Controllo stream completato:
 \begin{minted}{c}
 cudaError_t cudaStreamQuery(cudaStream_t stream);
 \end{minted}
-Controlla se le operazioni sono completate ma non forza blocco dell'host in caso negativo. Ritorna \texttt{cudaSuccess} o \texttt{cudaErrorNotReady}.\\
 
-\newpage
+Controlla se le operazioni sono completate ma non forza blocco dell'host in caso negativo. Ritorna \texttt{cudaSuccess} o \texttt{cudaErrorNotReady}.
 
 \paragraph{Sovrapporre kernel e trasferimento dati:} Devono essere verificati diversi requisiti perché si possa effettuare questa sovrapposizione:
 \begin{enumerate}
 	\item Il device deve essere capace di "concurrent copy and execution", indagato con il campo \texttt{deviceOverlap} della struct \texttt{cudaDeviceProp} (tutti i device con compute capability $\geq$1.1 hanno questa capacità)
+
 	\item Il kernel e trasferimento dati devono appartenere a differenti non-default stream
+
 	\item La host memory coinvolta nel trasferimento deve essere pinned memory
 \end{enumerate}
 
-Se si possono fare trasferimenti ed esecuzione dati parallelamente, potrebbe essere conveniente dividere un blocco di dati grande $N$ in $M$ sotto-gruppi da elaborare, permettendo di sovrapporre trasferimenti H2D (e poi D2H) con l'esecuzione di kernel. I trasferimenti sono gestiti tramite DMA; usiamo $N/M$ stream.\\
+Se si possono fare trasferimenti ed esecuzione dati parallelamente, potrebbe essere conveniente dividere un blocco di dati grande $N$ in $M$ sotto-gruppi da elaborare, permettendo di sovrapporre trasferimenti H2D (e poi D2H) con l'esecuzione di kernel. I trasferimenti sono gestiti tramite DMA; usiamo $N/M$ stream.
 
-\paragraph{Default Stream prima di CUDA 7:} Il funzionamento è cambiato da CUDA 7, ma il default stream è utile quando la concorrenza non è cruciale al fine delle performance. Prima di CUDA 7, ogni device ha un defult stream usato per tutti i thread host, il quale porta a sincronizzazione implicita.\\
+\paragraph{Default Stream prima di CUDA 7:} Il funzionamento è cambiato da CUDA 7, ma il default stream è utile quando la concorrenza non è cruciale al fine delle performance. Prima di CUDA 7, ogni device ha un defult stream usato per tutti i thread host, il quale porta a sincronizzazione implicita.
 
-\paragraph{Sincronizzazione rispetto NULL-stream:} Un NULL-stream blocca tutte le precedenti operazioni dell'host con la sola eccezione del lancio kernel. Anche se i non-NULL stream sono non-bloccanti rispetto all'host, possono esssere sincroni o asincroni rispetto al NULL-stream. \\
+\paragraph{Sincronizzazione rispetto NULL-stream:} Un NULL-stream blocca tutte le precedenti operazioni dell'host con la sola eccezione del lancio kernel. Anche se i non-NULL stream sono non-bloccanti rispetto all'host, possono essere sincroni o asincroni rispetto al NULL-stream. 
 
 Per questo gli stream non-NULL possono essere di due tipi: 
 \begin{itemize}
-	\item Blocking stream: lo stream NULL è bloccante
-	\item Non-blocking stream: lo stream NULL non è bloccante
+	\item \textbf{Blocking} stream: lo stream NULL è bloccante
+	
+	\item \textbf{Non-blocking} stream: lo stream NULL non è bloccante
 \end{itemize}
 
-Gli stream creati usando \texttt{cudaStreamCreate} sono bloccanti: l'esecuzione di operazioni in questi stream vengono bloccate in attesa del completamento di operazioni dello stream NULL.  Il NULL stream è implicitamente definito e sincronizza con tutti gli altri stream bloccanti nello stesso contesto CUDA. In generale il NULL stream non si sovrappone con nessun altro stream bloccante.\\
+Gli stream creati usando \texttt{cudaStreamCreate} sono bloccanti: l'esecuzione di operazioni in questi stream vengono bloccate in attesa del completamento di operazioni dello stream NULL.  
+
+Il NULL stream è implicitamente definito e sincronizza con tutti gli altri stream bloccanti nello stesso contesto CUDA. In generale il NULL stream non si sovrappone con nessun altro stream bloccante.
 
 Dal punto di vista dell'host ogni kernel è asincrono e non-bloccante, ma nell'esempio: 
 \begin{minted}{c}
@@ -475,68 +525,78 @@ kernel_1<<<1, 1, 0, stream_1>>>();
 kernel_2<<<1, 1>>>();
 kernel_3<<<1, 1, 0, stream_2>>>();
 \end{minted}
-\texttt{kernel\_2} non può partire finché non termina \texttt{kernel\_1} e similmente \texttt{kernel\_3} con \texttt{kernel\_2}.\\
+\texttt{kernel\_2} non può partire finché non termina \texttt{kernel\_1} e similmente \texttt{kernel\_3} con \texttt{kernel\_2}.
 
 CUDA runtime permette di definire il comportamento di uno stream non-NULL in relazione al NULL stream:
 \begin{itemize}
 	\item NULL stream e non-NULL stream sono generalmente bloccanti tra loro
+	
 	\item \texttt{cudaStreamCreateWithFlags(*stream, flag)} permette di aggiungere la flag \texttt{cudaStreamNonBlocking} per rendere lo stream creato non bloccante
 \end{itemize}
-Inoltre, in generale, stream non-NULL sono tra loro non bloccanti.\\
+Inoltre, in generale, stream non-NULL sono tra loro non bloccanti.
 
-\paragraph{Post Cuda 7:} Prima di CUDA 7, ogni device ha un singolo default stream usato per tutti i thread dell'host che causano sincronizzazione implicita. CUDA 7 introduce la nuova opzione \texttt{per-thread default stream}, che ha due effetti:
+\paragraph{Post Cuda 7:} Prima di CUDA 7, ogni device ha un singolo default stream usato per tutti i thread dell'host che causano sincronizzazione implicita. 
+
+CUDA 7 ha introdotto la nuova opzione \texttt{per-thread default stream}, che ha due effetti:
 \begin{enumerate}
-	\item Assegna a ogni thread dell’host il proprio default stream (comandi inviati al default stream da diversi thread dell'host possono eseguire concorrentemente)
+	\item Assegna a ogni thread dell'host il proprio default stream (comandi inviati al default stream da diversi thread dell'host possono eseguire concorrentemente)
+	
 	\item I default stream sono stream regolari (comandi nel default stream possono eseguire in concorrenza con quelli in un non-default stream)
 \end{enumerate}
+
 Per abilitare per-thread default stream compilare con \texttt{nvcc} command-line option \texttt{--default-stream per-thread}, o definire la macro per il preprocessore \texttt{\#define CUDA\_API\_PER\_THREAD\_DEFAULT\_STREAM}.\\
 
-\paragraph{Priorità negli stream:} Si possono creare stream con priorità (da CC 3.5). Una grid con più alta priorità può prelazionare il lavoro già in esecuzione con più bassa priorità. Hanno effetto solo su kernel e non su data transfer. Priorità al di fuori del range vengono riportate automaticamente nel range.\\
+\paragraph{Priorità negli stream:} Si possono creare stream con priorità (da CC 3.5). Una grid con più alta priorità può prelazionare il lavoro già in esecuzione con più bassa priorità. 
+
+Hanno effetto solo su kernel e non su data transfer. Priorità al di fuori del range vengono riportate automaticamente nel range.
 
 Per creare e gestire uno stream con priorità si usano le funzioni:
 \begin{minted}{c}
 cudaError_t cudaStreamCreateWithPriority(
 	cudaStream_t* pStream, unsigned int flags, int priority);
 \end{minted}
+
 Crea un nuovo stream con priorità intera e ritorna l'handle in \texttt{pStream}.
 
 \begin{minted}{c}
 cudaError_t cudaDeviceGetStreamPriorityRange(
 	int *leastPriority, int *greatestPriority);
 \end{minted}
-Restituisce la minima e massima priorità del device (la più alta è la minima).\\
 
-\paragraph{Host Functions (Callback):} Si ha la possibilità di inserire una funzione host, senza introdurre sincronizzazione o interrompere il flusso dello stream. Questa funzione viene eseguita sull'host una volta che tutti i comandi forniti allo stream prima della chiamata sono stati eseguiti.\\
+Restituisce la minima e massima priorità del device (la più alta è la minima).
+
+\paragraph{Host Functions (Callback):} Si ha la possibilità di inserire una funzione host, senza introdurre sincronizzazione o interrompere il flusso dello stream. Questa funzione viene eseguita sull'host una volta che tutti i comandi forniti allo stream prima della chiamata sono stati eseguiti.
 
 \subsubsection{CUDA Event}
-%Controllo e sincronizzazoione tra stream.
 
-Un \textbf{evento} è un \textbf{marker all'interno di uno stream} associato a un \textbf{punto del flusso di operazioni}. Serve per controllare se l'esecuzione di uno stream ha raggiunto un dato punto o anche per la sincronizzazione inter-stream. Permettono controllo e sincronizzazione tra stream.\\
+Un \textbf{evento} è un \textbf{marker all'interno di uno stream} associato a un \textbf{punto del flusso di operazioni}. Serve per controllare se l'esecuzione di uno stream ha raggiunto un dato punto o anche per la sincronizzazione inter-stream. Permettono controllo e sincronizzazione tra stream.
 
 Può essere usato per due scopi base:
 \begin{itemize}
-	\item Sincronizzare l'esecuzione di stream
-	\item Monitorare il progresso del device
+	\item \textbf{Sincronizzare l'esecuzione} di stream
+	
+	\item \textbf{Monitorare il progresso} del device
 \end{itemize}
 
-Le API CUDA forniscono funzioni che consentono di inserire eventi in qualsiasi punto dello stream. Oppure effettuare delle query per sapere se lo stream è stato completato. \\
+Le API CUDA forniscono funzioni che consentono di inserire eventi in qualsiasi punto dello stream. Oppure effettuare delle query per sapere se lo stream è stato completato. 
 
-Eventi sullo stream di default sincronizzano con tutte le precedenti operazioni su tutti gli stream.\\
+Eventi sullo stream di default sincronizzano con tutte le precedenti operazioni su tutti gli stream.
 
 Creazione:
 \begin{minted}{c}
 cudaEvent_t event;
 cudaError_t cudaEventCreate(cudaEvent_t* event);
 \end{minted}
-Crea un nuovo evento di nome \texttt{event}.\\
+Crea un nuovo evento di nome \texttt{event}.
 
-Gli eventi nello stream zero vengono completati dopo che tutti i precedenti comandi in tutti gli stream sono stati completati. Ogni evento ha uno stato booleano: occorso/non occorso.\\
+Gli eventi nello stream zero vengono completati dopo che tutti i precedenti comandi in tutti gli stream sono stati completati. Ogni evento ha uno stato booleano: occorso/non occorso.
 
 Per distruggerlo
 \begin{minted}{c}
 cudaError_t cudaEventDestroy(cudaEvent_t event);
 \end{minted}
-Completa il rilascio di risorse.\\
+
+Questo completa il rilascio di risorse.
 
 Per usarli, si registra un evento su uno stream:
 \begin{minted}{c}
@@ -550,10 +610,12 @@ Poi si possono usare altre funzioni per:
 	\begin{minted}{c}
 cudaError_t cudaEventSynchronize(cudaEvent_t event);
 	\end{minted}
+	
 	\item controllare l'avvenimento di un evento, senza bloccare
 	\begin{minted}{c}
 cudaError_t cudaEventQuery(cudaEvent_t event);
 	\end{minted}
+	
 	\item far attendere uno stream sull'occorrenza dell'evento su un altro stream
 	\begin{minted}{c}
 cudaError_t cudaStreamWaitEvent(
@@ -561,22 +623,23 @@ cudaError_t cudaStreamWaitEvent(
 	\end{minted}
 \end{itemize}
 
-\newpage
-
 \paragraph{Sincronizzazione Esplicita:} CUDA runtime supporta diversi modi di sincronizzazione esplicita a livello di grid in un programma CUDA, si può sincronizzare rispetto
 \begin{itemize}
 	\item al device
+	
 	\item ad uno stream
+	
 	\item a un evento all'interno di uno stream
+	
 	\item a diversi stream (tra loro), usando un evento
 \end{itemize}
 
-Si può bloccare l'host fino a che il device non abbia completato i task precedenti:
+Si può bloccare l'host fino a che il device non ha completato i task precedenti:
 \begin{minted}{c}
 cudaError_t cudaDeviceSynchronize(void);
 \end{minted}
 
-Si può bloccare l'host fino a che tutte le operazioni in uno stream siano state completate (\texttt{cudaStreamSynchronize}) oppure eseguire un test non-bloccante (\texttt{cudaStreamQuery}):
+Si può bloccare l'host fino a che tutte le operazioni in uno stream sono completate (\texttt{cudaStreamSynchronize}) oppure eseguire un test non-bloccante (\texttt{cudaStreamQuery}):
 \begin{minted}{c}
 cudaError_t cudaStreamSynchronize(cudaStream_t stream);
 cudaError_t cudaStreamQuery(cudaStream_t stream);

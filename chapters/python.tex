@@ -2,62 +2,77 @@
 
 \section{CUDA Python}
 
-L'idea è quella di avere codice python che sfrutta runtime CUDA per sfruttare il parallelismo esposto dalla GPU.\\
+L'idea è quella di avere codice python che sfrutta runtime CUDA per sfruttare il parallelismo esposto dalla GPU.
 
-\paragraph{pyCUDA:} L'idea di PyCUDA è di fare un "wrap" del codice C.\\
+\paragraph{pyCUDA:} L'idea di PyCUDA è di fare un "wrap" del codice C.
 
-\paragraph{PyTorch:} Uno dei più usati, spesso per il ML, orientato anche a non programmatori CUDA (generalmente chi lo usa lo fa in modo trasparente, senza sapere il funzionamento della GPU sottostante). L'idea è quella di replicare librerie all'interno di torch, usando CUDA in maniera trasparente (ad esempio numPy).\\
+\paragraph{PyTorch:} Uno dei più usati, spesso per il ML, orientato anche a non programmatori CUDA (generalmente chi lo usa lo fa in modo trasparente, senza sapere il funzionamento della GPU sottostante). L'idea è quella di replicare librerie all'interno di torch, usando CUDA in maniera trasparente (ad esempio numPy).
 
-\paragraph{Rapids:} Azienda che produce molteplici software, include alcune librerie come CuPy (NumPy e SciPy su GPU). \\
+\paragraph{Rapids:} Azienda che produce molteplici software, include alcune librerie come CuPy (NumPy e SciPy su GPU). 
 
 \subsection{Numba for CPU}
 
-Per la CPU, Numba nasce con l'idea di accelerare tramite parallelismo su CPU.  Numba è un package compilato Just-In-Time, non richiede uno step di compilazione dedicato, compila solo le funzioni che servono, usa LLVM per la traduzione a linguaggio macchina. Numba si integra con l'ecosistema python (NumPy, Pandas, \dots) e permette di usare solo codice Python per fare tutto.\\
+Per la CPU, Numba nasce con l'idea di accelerare tramite parallelismo su CPU.  Numba è un package compilato Just-In-Time, non richiede uno step di compilazione dedicato, compila solo le funzioni che servono, usa LLVM per la traduzione a linguaggio macchina. Numba si integra con l'ecosistema python (NumPy, Pandas, \dots) e permette di usare solo codice Python per fare tutto.
 
-\paragraph{Decoratori in Python:} Un decoratore è un oggetto usato per modificare una funzione, metodo o classe per trasformarla. Per Numba, si usa il decoratore \texttt{@numba.jit} prima della funzione. \\
+\paragraph{Decoratori in Python:} Un decoratore è un oggetto usato per modificare una funzione, metodo o classe per trasformarla. Per Numba, si usa il decoratore \texttt{@numba.jit} prima della funzione. 
 
-\paragraph{Ufuncs:} Le funzioni universali sono un concetto introdotto da NumPy per indicare funzioni che operano elemento per elemento su un array NumPy. Permettono di eliminare la necessità di scrivere esplicitamente i ciclo \texttt{for} e sono (solitamente) compilate in C per efficienza. \\
+\paragraph{Ufuncs:} Le funzioni universali sono un concetto introdotto da NumPy per indicare funzioni che operano elemento per elemento su un array NumPy. Permettono di eliminare la necessità di scrivere esplicitamente i ciclo \texttt{for} e sono (solitamente) compilate in C per efficienza. 
 
 \paragraph{Vectorize Decorator:} Le operazioni vettorizzate eliminano i loop espliciti e permettono: 
 \begin{itemize}
 	\item maggiore velocità: non bisogna interpretare più volte la stessa operazione e le computazioni possono avvenire in parallelo
+	
 	\item minore overhead di memoria: minimizzando le variabili temporanea ed effettuando gli scambi in place, con conseguente miglior utilizzo della cache (e quindi performance)
+	
 	\item miglior uso del modello SIMD della CPU
+	
 	\item si può anche avere accelerazione GPU
 \end{itemize}
 
 \paragraph{Chiamare una funzione \texttt{@jit}:} 
 \begin{itemize}
 	\item determinare il tipo degli argomenti forniti
+	
 	\item controllare se esiste una versione compilata a codice macchina e, nel caso, utilizzarla
+	
 	\item compilare, se necessario, una versione in linguaggio macchina ottimizzata
+	
 	\item convertire i parametri, questi vengono convertiti in valori compatibili con il codice macchina
+	
 	\item eseguire il codice ottimizzato, viene chiamata direttamente la funzione compilata
+	
 	\item convertire il risultato in una valore compatibile con Python
 \end{itemize}
 
 \subsection{Numba for GPU}
 
-Anche qui si possono costruire le funzioni universali e vettorizzazione, si può dire che il target è CUDA, "dirottando" la compilazione verso CUDA tramite un semplice decoratore. Si tratta però di un modello piuttosto rigido.\\
+Anche qui si possono costruire le funzioni universali e vettorizzazione, si può dire che il target è CUDA, "dirottando" la compilazione verso CUDA tramite un semplice decoratore. Si tratta però di un modello piuttosto rigido.
 
-Si possono invece definire kernel sulla GPU con \texttt{@cuda.jit}. Si possono lanciare kernel con \texttt{kernel[nBlocks, nThreads](args)}, supportano shared, pinned e local memory. Viene usato \texttt{nvcc} per compilare.\\
+Si possono invece definire kernel sulla GPU con \texttt{@cuda.jit}. Si possono lanciare kernel con \texttt{kernel[nBlocks, nThreads](args)}, supportano shared, pinned e local memory. Viene usato \texttt{nvcc} per compilare.
 
-\paragraph{Dichiarazione dei kernel:} Non possono tornare esplicitamente valori, quindi tutti i dati devono essere scritti su array passati alla funzione. Va dichiarata esplicitamente la thread hierarchy (numero di grid e blocchi). Una funzione può essere chiamata più volte, con diversi parametri e thread hierarchy, ma viene compilata una sola volta.\\
+\paragraph{Dichiarazione dei kernel:} Non possono tornare esplicitamente valori, quindi tutti i dati devono essere scritti su array passati alla funzione. Va dichiarata esplicitamente la thread hierarchy (numero di grid e blocchi). Una funzione può essere chiamata più volte, con diversi parametri e thread hierarchy, ma viene compilata una sola volta.
 
 \paragraph{Thread Hierarchy:} I valori della gerarchia possono essere ottenuti con: 
 \begin{itemize}
 	\item \texttt{numba.cuda.threadIdx}: indice del thread all'interno del blocco, da \texttt{0} a \texttt{numba.cuda.blockDim-1}
+	
 	\item \texttt{numba.cuda.blockDim}: dimensione del blocco di thread, per come dichiarato per l'istanza del kernel 
+	
 	\item \texttt{numba.cuda.blockIdx}: indice del blocco all'interno della griglia di thread, da \texttt{0} a \texttt{numba.cuda.gridDim-1}
+	
 	\item \texttt{numba.cuda.gridDim}: dimensione della griglia di blocchi, numero totale di blocchi lanciati per l'istanza del kernel
 \end{itemize}
+
 Mentre le posizioni assolute si possono ottenere con: 
 \begin{itemize}
 	\item \texttt{numba.cuda.grid(ndim)}: torna la posizione assoluta del thread all'interno dell'intera griglia di blocchi; \texttt{ndim} deve corrispondere al numero di dimensioni dichiarate per l'istanza del kernel, se i\texttt{=1} torna un solo interno, altrimenti una tupla contenente quel numero di interi
+	
 	\item \texttt{numba.cuda.gridsize(ndim)}: torna la dimensione assoluta ("forma") in thread dell'intera griglia di blocchi
 \end{itemize}
 
-Vale la pena ricordare che in Python il tipo di default è \texttt{f64} (o qualcosa di simile), quindi senza specificare il tipo anche la libreria userà quello come tipo, magari non è richiesta tale precisione (in genere in CUDA non si lavora con i 64), bisogna specificare la precisione. Ad esempio usando \texttt{.astype(np.float32)}.\\
+Vale la pena ricordare che in Python il tipo di default è \texttt{f64} (o qualcosa di simile, idk), quindi senza specificare il tipo anche la libreria userà quello come tipo.
+
+Magari non è richiesta tale precisione (in genere in CUDA non si lavora con f64), quindi bisogna specificare esplicitamente il tipo. Ad esempio usando \texttt{.astype(np.float32)}.
 
 \paragraph{Funzioni device:} Si possono scrivere funzioni richiamabili solo dall'interno del device, con il decoratore \texttt{@cuda.jit(device=True)}, ad esempio:
 \begin{minted}{python}
@@ -68,7 +83,7 @@ def a_device_function(a, b):
 
 \subsection{Gestione della memoria}
 
-Numba trasferisce atomaticamente gli array NumPy quando viene invocato il kernel, ma lo può fare solo in modo "conservativo", quindi trasferisce sempre la memoria device back to the host quando finisce. Si possono gestire manualmente i trasferimenti per evitare di passare inutilmente array read-only.\\
+Numba trasferisce automaticamente gli array NumPy quando viene invocato il kernel, ma lo può fare solo in modo "conservativo", quindi trasferisce sempre la memoria device back to the host quando finisce. Si possono gestire manualmente i trasferimenti per evitare di passare inutilmente array read-only.
 
 Api per allocare e trasferire:
 \begin{itemize}
@@ -76,10 +91,12 @@ Api per allocare e trasferire:
 	\begin{minted}{python}
 numba.cuda.device_array(shape, dtype=..., strides=..., stream=0)
 	\end{minted}
+	
 	\item Chiama \texttt{device\_array()} con informazioni dall'array
 	\begin{minted}{python}
 numba.cuda.device_array_like(ary, stream=0)
 	\end{minted}
+	
 	\item Alloca e trasferisce un ndarray numpy o uno scalare strutturato al device
 	\begin{minted}{python}
 numba.cuda.to_device(obj, stream=0, copy=True, to=None)
@@ -92,14 +109,17 @@ numba.cuda.to_device(obj, stream=0, copy=True, to=None)
 	\begin{minted}{python}
 numba.cuda.pinned(*arylist)
 	\end{minted}
+	
 	\item Alloca un ndarray con un buffer pinnato (pagelocked)
 	\begin{minted}{python}
 numba.cuda.pinned_array(shape, dtype=…, strides=…, order='C')
 	\end{minted}
+	
 	\item Chiama un array pinned con le informazioni dall'array 
 	\begin{minted}{python}
 numba.cuda.pinned_array_like(ary)
 	\end{minted}
+	
 	\item Un context manager  per mappare temporaneamente una sequenza di ndarray host
 	\begin{minted}{python}
 numba.cuda.mapped(*arylist, **kws)
@@ -107,6 +127,8 @@ numba.cuda.mapped(*arylist, **kws)
 \end{itemize}
 
 \paragraph{Deallocazione:} In generale, la deallocazione è gestita in modo automatico, tracciata per-contex. Nei casi di gestione asincrona la deallocazione automatica potrebbe causare problemi, quindi \texttt{numba.cuda.defer\_cleanup()} permette di fermare la deallocazione (usata tramite blocco with). 
+
+Esempio:
 \begin{minted}{python}
 with defer_cleanup():
 	# all cleanup is deferred in here
@@ -139,24 +161,23 @@ Durante la chiamata a kernel va specificata la dimensione in byte della shared m
 \begin{minted}{python}
 kernel_func[32, 32, 0, 128](x)
 \end{minted}
-L'ultimo parametro è la shared memory.\\
+L'ultimo parametro è la shared memory.
 
-Tutta la memoria dinamica diventa un alias allo stesso array; dichiarando più array dinamici quello che succede sarà che ci saranno solamente più puntatori ad uno stesso array, con interpretazioni differenti (stessi dati).\\
+Tutta la memoria dinamica diventa un alias allo stesso array; dichiarando più array dinamici quello che succede sarà che ci saranno solamente più puntatori ad uno stesso array, con interpretazioni differenti (stessi dati).
 
 Una soluzione al problema può essere invertire un array, raddoppiando la dimensione totale durante la chiamata:
 \begin{minted}{python}
 f32_arr = cuda.shared.array(0, dtype=np.float32)
 i32_arr = cuda.shared.array(0, dtype=np.int32)[1:]
 \end{minted}
-In questo modo uno viene letto dall'inizio, uno dal fondo. Servono visioni disgiunte degli array.\\
+
+In questo modo uno viene letto dall'inizio, uno dal fondo. Servono visioni disgiunte degli array.
 
 \subsection{Atomic Operations}
 
-Si possono usare operazioni atomiche per evitare race conditions, le quali possono accadere nei casi di \textbf{read-after-write} (un thread prova a leggere una cella di memoria nello stesso momento in cui un altro sta scrivendo) oppure \textbf{write-after-write} (due thread provano a scrivere nello stesso momento).\\
+Si possono usare operazioni atomiche per evitare race conditions, le quali possono accadere nei casi di \textbf{read-after-write} (un thread prova a leggere una cella di memoria nello stesso momento in cui un altro sta scrivendo) oppure \textbf{write-after-write} (due thread provano a scrivere nello stesso momento).
 
-Il namespace per le operazioni atomiche è la classe \texttt{numba.cuda.atomic}. Ad esempio, \texttt{add(ary, idx, val)} svolge l'operazione atomica \texttt{ary[idx] += val}; supportata su \texttt{i32}, \texttt{f32} e \texttt{f64}.\\
-
-\newpage
+Il namespace per le operazioni atomiche è la classe \texttt{numba.cuda.atomic}. Ad esempio, \texttt{add(ary, idx, val)} svolge l'operazione atomica \texttt{ary[idx] += val}; supportata su \texttt{i32}, \texttt{f32} e \texttt{f64}.
 
 \subsection{Streams}
 
@@ -166,19 +187,19 @@ La funzione
 \begin{minted}{python}
 numba.cuda.stream()
 \end{minted}
-crea uno stream CUDA, il quale rappresenta la coda dei comandi per il dispositivo.\\
+crea uno stream CUDA, il quale rappresenta la coda dei comandi per il dispositivo.
 
 La funzione
 \begin{minted}{python}
 numba.cuda.default_stream()
 \end{minted}
-restituisce lo stream di default. Solitamente, il default stream si comporta in maniera legacy o per-thread on base alla API CUDA in uso.\\
+restituisce lo stream di default. Solitamente, il default stream si comporta in maniera legacy o per-thread on base alla API CUDA in uso.
 
 La funzione
 \begin{minted}{python}
 Stream.synchronize()
 \end{minted}
-permette la sincronizzazione all'interno dello stream, i.e., aspetta che tutti i comandi all'interno dello stream vengano eseguiti.\\
+permette la sincronizzazione all'interno dello stream, i.e., aspetta che tutti i comandi all'interno dello stream vengano eseguiti.
 
 %Manca la parte sulle librerie Numba e su CuPy, ma davvero insignificante
 
