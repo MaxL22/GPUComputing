@@ -11,7 +11,7 @@ Le funzioni:
 \begin{minted}{c}
 cudaError_t cudaGetDeviceCount(&dev_count)
 cudaError_t cudaGetDeviceProperties(cudaDeviceProp* prop,
-	int device);
+    int device);
 \end{minted}
 Permettono di indagare il numero di device disponibili sul sistema e restituire le proprietà del device nella struttura \texttt{cudaDeviceProp} (rispettivamente).
 
@@ -80,10 +80,10 @@ Vogliamo mettere carico di lavoro dove serve e scegliere la granularità del lav
 Esempio: un kernel figlio viene chiamato all'interno di un kernel padre e quest'ultimo può utilizzare i risultati prodotti dal figlio senza nessuna interazione da parte della CPU
 \begin{minted}{c}
 __global__ ChildKernel(void* data) {
-	//Operate on data
+    //Operate on data
 }
 __global__ ParentKernel(void* data) {
-	ChildKernel<<<16, 1>>>(data);
+    ChildKernel<<<16, 1>>>(data);
 }
 // In Host Code
 ParentKernel<<<256, 64>>(data);
@@ -192,13 +192,13 @@ Dove $(r,c)$ sono le coordinate del valore cercato e $M$ è l'altezza della matr
 	\item Copia \texttt{n} elementi di dimensione \texttt{elemSize} da \texttt{cpumem} sulla CPU ad un vettore \texttt{gpumem} sulla GPU
 	\begin{minted}{c}
 cublasSetVector(int n, int elemSize, const void *cpumem, 
-	int incx, void *gpumem, int incy)
+    int incx, void *gpumem, int incy)
 	\end{minted}
 	
 	\item L'inverso di prima (da GPU a CPU)
 	\begin{minted}{c}
 cublasGetVector(int n, int elemSize, const void *gpumem, 
-	int incx, void *cpumem, int incy)
+    int incx, void *cpumem, int incy)
 	\end{minted}
 \end{itemize}
 
@@ -207,15 +207,15 @@ Per trasferire matrici (sempre column-major order):
 	\item copia una matrice \texttt{rows} $\times$ \texttt{cols}, di elementi grossi \texttt{elemSize}, da \texttt{A} nella memoria CPU a \texttt{B} nella memoria GPU
 	\begin{minted}{c}
 cublasSetMatrix(int rows, int cols, int elemSize, 
-	const void *A, int lda, void *B, int ldb)
+    const void *A, int lda, void *B, int ldb)
 	\end{minted}
 	esiste anche il corrispettivo \texttt{cublasGetMatrix()} che fa l'inverso
 	
 	\item come \texttt{cublasGetMatrix()}, ma asincrono (rispetto all'host), usando il parametro \texttt{stream} fornito
 	\begin{minted}{c}
 cublasGetMatrixAsync(int rows, int cols, int elemSize, 
-	const void *A, int lda, void *B, 
-	int ldb, cudaStream_t stream)
+    const void *A, int lda, void *B, 
+    int ldb, cudaStream_t stream)
 	\end{minted}
 \end{itemize}
 
@@ -261,8 +261,8 @@ $$ result = \sum_{i=1}^{n} x[k] \cdot y[j], \quad k = 1 + (i-1) \cdot incx, \qua
 tra vettori \texttt{x} e \texttt{y} di \texttt{n} elementi (dimensione dei tali nella naming convention) e mettere il risultato in \texttt{result}
 \begin{minted}{c}
 cublasStatus_t cublasSdot(cublasHandle_t handle, int n, 
-	const float *x, int incx, const float *y, 
-	int incy, float result)
+    const float *x, int incx, const float *y, 
+    int incy, float result)
 \end{minted}
 
 Per fare 
@@ -270,8 +270,8 @@ $$ y[i] = \alpha \cdot x[i] + y[i] \quad \forall i \in n $$
 con vettori \texttt{x} e \texttt{y} di dimensione \texttt{n}, risultato nel secondo vettore \texttt{y}
 \begin{minted}{c}
 cublasStatus_t cublasSaxpy(cublasHandle_t handle, int n,
-	const float *alpha, const float *x, int incx, 
-	const float *y, int incy)
+    const float *alpha, const float *x, int incx, 
+    const float *y, int incy)
 \end{minted}
 
 Per fare 
@@ -279,10 +279,10 @@ $$ y = \alpha Ax + \beta y$$
 dove $\alpha$ e $\beta$ sono scalari, $A$ è una matrice, $x$ e $y$ sono vettori
 \begin{minted}{c}
 cublasStatus_t cublasSgemv(cublasHandle_t handle, 
-	cublasOperation_t trans, int m, int n, 
-	const float *alpha, const float *A, 
-	int lda, const float *x, int incx, 
-	const float *beta, float *y, int incy)
+    cublasOperation_t trans, int m, int n, 
+    const float *alpha, const float *A, 
+    int lda, const float *x, int incx, 
+    const float *beta, float *y, int incy)
 \end{minted}
 
 Per fare
@@ -290,11 +290,11 @@ $$ C = \alpha AB + \beta C$$
 dove $\alpha$ e $\beta$ scalari, $A$, $B$ e $C$ matrici
 \begin{minted}{c}
 cublasStatus_t cublasSgemm(cublasHandle_t handle,
-	cublasOperation_t transa, cublasOperation_t transb,
-	int m, int n, int k, const float *alpha,
-	const float *A, int lda,
-	const float *B, int ldb,
-	const float *beta, float *C, int ldc)
+    cublasOperation_t transa, cublasOperation_t transb,
+    int m, int n, int k, const float *alpha,
+    const float *A, int lda,
+    const float *B, int ldb,
+    const float *beta, float *C, int ldc)
 \end{minted}
 
 \subsubsection{cuRAND}
@@ -344,7 +344,7 @@ curandSetRandomGeneratorSeed(g, SEED)
 	
 	\item Per generare una distribuzione
 	\begin{minted}{c}
-curandGenerate______(…)
+curandGenerate______(...)
 	\end{minted}
 	dipende dalla distribuzione che si vuole generare, ad esempio: \texttt{curandGenerateUniform(g, src, n)} oppure \texttt{curandGenerateNormal(g, src, n, mean, stddev)}. 
 
@@ -406,7 +406,7 @@ cudaError_t cudaStreamCreate(cudaStream_t* pStream );
 	\item lancio del kernel
 	\begin{minted}{c}
 kernel_name<<< grid, block, sharedMemSize, pStream >>>
-	(argument list);
+    (argument list);
 	\end{minted}
 	
 	\item eliminazione di stream:
@@ -419,14 +419,14 @@ Anche le operazioni di trasferimento: per \textbf{allocare} spazio su \textbf{pi
 \begin{minted}{c}
 cudaError_t cudaMallocHost(void **ptr, size_t size);
 cudaError_t cudaHostAlloc(void **pHost, size_t size, 
-	unsigned int flags);
+    unsigned int flags);
 \end{minted}
 
 Alloca su host memoria non paginabile (pinned memory), \texttt{flag} indica specifiche proprietà di allocazione (se \texttt{0} le due API sono uguali). In seguito, per fare \textbf{trasferimento asincrono} basato su pinned memory
 \begin{minted}{c}
 cudaError_t cudaMemcpyAsync(void* dst, const void* src, 
-	size_t count, cudaMemcpyKind kind, 
-	cudaStream_t stream );
+    size_t count, cudaMemcpyKind kind, 
+    cudaStream_t stream );
 \end{minted}
 
 \paragraph{Tipi di stream:} Le operazioni CUDA vengono eseguite esplicitamente o implicitamente su uno stream. Ne esistono di due tipi: 
@@ -554,14 +554,14 @@ Hanno effetto solo su kernel e non su data transfer. Priorità al di fuori del r
 Per creare e gestire uno stream con priorità si usano le funzioni:
 \begin{minted}{c}
 cudaError_t cudaStreamCreateWithPriority(
-	cudaStream_t* pStream, unsigned int flags, int priority);
+    cudaStream_t* pStream, unsigned int flags, int priority);
 \end{minted}
 
 Crea un nuovo stream con priorità intera e ritorna l'handle in \texttt{pStream}.
 
 \begin{minted}{c}
 cudaError_t cudaDeviceGetStreamPriorityRange(
-	int *leastPriority, int *greatestPriority);
+    int *leastPriority, int *greatestPriority);
 \end{minted}
 
 Restituisce la minima e massima priorità del device (la più alta è la minima).
@@ -602,7 +602,7 @@ Questo completa il rilascio di risorse.
 Per usarli, si registra un evento su uno stream:
 \begin{minted}{c}
 cudaError_t cudaEventRecord(
-	cudaEvent_t event, cudaStream_t stream);
+    cudaEvent_t event, cudaStream_t stream);
 \end{minted}
 
 Poi si possono usare altre funzioni per:
@@ -620,7 +620,7 @@ cudaError_t cudaEventQuery(cudaEvent_t event);
 	\item far attendere uno stream sull'occorrenza dell'evento su un altro stream
 	\begin{minted}{c}
 cudaError_t cudaStreamWaitEvent(
-	cudaStream_t stream , cudaEvent_t event);
+    cudaStream_t stream , cudaEvent_t event);
 	\end{minted}
 \end{itemize}
 

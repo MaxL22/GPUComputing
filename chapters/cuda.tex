@@ -318,8 +318,8 @@ Queste presupponendo che la lunghezza del vettore sia una potenza di 2 e che $i$
 Un possibile codice:
 \begin{minted}{c}
 for (int stride = 1; stride < blockDim.x; stride *= 2) {
-	if ((tid % (2 * stride)) == 0)
-		idata[tid] += idata[tid + stride];
+    if ((tid % (2 * stride)) == 0)
+        idata[tid] += idata[tid + stride];
 }
 \end{minted}
 
@@ -328,10 +328,10 @@ Questa soluzione può introdurre divergenza crescente a livello di warp: i threa
 Vogliamo eliminare la divergenza, fondamentalmente usando thread adiacenti (quindi all'interno dello stesso warp): "convertiamo" gli indici in modo da usare sempre i \texttt{tid} più bassi possibili:
 \begin{minted}{c}
 for (int stride = 1; stride < blockDim.x; stride *= 2) {
-	int index = 2 * stride * tid;
-	if (index < blockDim.x)
-		idata[index] += idata[index + stride];
-	__syncthreads();
+    int index = 2 * stride * tid;
+    if (index < blockDim.x)
+        idata[index] += idata[index + stride];
+    __syncthreads();
 \end{minted}
 
 Da notare come viene eliminata la clausola \texttt{if} in tutti i thread. La locazione delle somme parziali non cambia, viene modificato solo l'indice dei thread.

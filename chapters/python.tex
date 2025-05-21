@@ -1,5 +1,4 @@
 % !TeX spellcheck = it_IT
-
 \section{CUDA Python}
 
 L'idea è quella di avere codice python che sfrutta runtime CUDA per sfruttare il parallelismo esposto dalla GPU.
@@ -78,7 +77,7 @@ Magari non è richiesta tale precisione (in genere in CUDA non si lavora con f64
 \begin{minted}{python}
 cuda.jit(device=True)
 def a_device_function(a, b):
-	return a + b
+    return a + b
 \end{minted}
 
 \subsection{Gestione della memoria}
@@ -89,7 +88,8 @@ Api per allocare e trasferire:
 \begin{itemize}
 	\item Alloca un ndarray device (similmente a \texttt{numpy.empty()})
 	\begin{minted}{python}
-numba.cuda.device_array(shape, dtype=..., strides=..., stream=0)
+numba.cuda.device_array(shape, dtype=..., 
+    strides=..., stream=0)
 	\end{minted}
 	
 	\item Chiama \texttt{device\_array()} con informazioni dall'array
@@ -112,7 +112,8 @@ numba.cuda.pinned(*arylist)
 	
 	\item Alloca un ndarray con un buffer pinnato (pagelocked)
 	\begin{minted}{python}
-numba.cuda.pinned_array(shape, dtype=…, strides=…, order='C')
+numba.cuda.pinned_array(shape, dtype=..., 
+    strides=..., order='C')
 	\end{minted}
 	
 	\item Chiama un array pinned con le informazioni dall'array 
@@ -131,8 +132,8 @@ numba.cuda.mapped(*arylist, **kws)
 Esempio:
 \begin{minted}{python}
 with defer_cleanup():
-	# all cleanup is deferred in here
-	do_speed_critical_code()
+    # all cleanup is deferred in here
+    do_speed_critical_code()
 # cleanup can occur here
 \end{minted}
 
@@ -154,7 +155,7 @@ numba.cuda.syncthreads()
 \begin{minted}{python}
 @cuda.jit
 def kernel_func(x):
-	dyn_arr = cuda.shared.array(0, dtype=np.float32)
+    dyn_arr = cuda.shared.array(0, dtype=np.float32)
 \end{minted}
 
 Durante la chiamata a kernel va specificata la dimensione in byte della shared memory:
