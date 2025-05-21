@@ -43,7 +43,8 @@ Nvidia mette a disposizione dei \textbf{developer tools} per effettuare profilin
 \paragraph{Nsight Systems:} Offre un'analisi a livello di sistema, ideale per identificare bottleneck nell'interazione tra CPU e GPU. Fornisce una visione d'insieme dell'intero flusso applicativo, monitorando la sincronizzazione tra processi e thread, il trasferimento dei dati e l'esecuzione complessiva. Permette di analizzare come le attività CUDA si integrino con il resto dell'applicazione, evidenziando le possibili ottimizzazioni per bilanciare meglio l'utilizzo di tutte le risorse hardware. \texttt{nsys, nsys-ui}, CLI e GUI.
 
 \subsection{Loop Unrolling}
-Il loop unrolling può essere utile per ottimizzare i cicli: questi vengono espansi ("srotolati") in modo da ridurre l'effettivo numero di iterazioni necessarie durante l'esecuzione del kernel. Il corpo del ciclo viene riscritto più volte. 
+
+Il loop unrolling può essere utile per ottimizzare i cicli: questi vengono espansi ("srotolati") in modo da ridurre l'effettivo numero di iterazioni necessarie durante l'esecuzione del kernel. Il corpo del ciclo viene riscritto più volte. Utile quando il numero di iterazioni è conosciuto a priori. 
 
 Questo ha diversi vantaggi, tra cui: 
 \begin{itemize}
@@ -98,19 +99,19 @@ Le librerie sono comode e quelle CUDA sono accelerate dalla GPU. Le API di molte
 
 Esempi di librerie CUDA:
 \begin{center}
-	\begin{tabular}{@{} ll @{}}
-		\hline
-		\textbf{Libreria}                     & \textbf{Dominio}                                    \\ \hline
-		cuFFT (NVIDIA)                        & Fast Fourier Transforms Linear                      \\
-		cuBLAS (NVIDIA)                       & Linear Algebra (BLAS Library)                       \\
-		cuSPARSE (NVIDIA)                     & Sparse Linear Algebra                               \\
-		cuRAND (NVIDIA)                       & Random Number Generation                            \\
-		NPP (NVIDIA)                          & Image and Signal Processing                         \\
-		CUSP (NVIDIA)                         & Sparse Linear Algebra and Graph Computations        \\
-		CUDA Math Library (NVIDIA)            & Mathematics                                         \\
-		Trust (terze parti)                   & Parallel Algorithms and Data Structures             \\
-		MAGMA (terze parti)                   & Next generation Linear Algebra                      \\ \hline
-	\end{tabular}
+	\resizebox{\linewidth}{!}{\begin{tabular}{@{} ll @{}}
+			\hline
+			\textbf{Libreria}                     & \textbf{Dominio}                                    \\ \hline
+			cuFFT (NVIDIA)                        & Fast Fourier Transforms Linear                      \\
+			cuBLAS (NVIDIA)                       & Linear Algebra (BLAS Library)                       \\
+			cuSPARSE (NVIDIA)                     & Sparse Linear Algebra                               \\
+			cuRAND (NVIDIA)                       & Random Number Generation                            \\
+			NPP (NVIDIA)                          & Image and Signal Processing                         \\
+			CUSP (NVIDIA)                         & Sparse Linear Algebra and Graph Computations        \\
+			CUDA Math Library (NVIDIA)            & Mathematics                                         \\
+			Trust (terze parti)                   & Parallel Algorithms and Data Structures             \\
+			MAGMA (terze parti)                   & Next generation Linear Algebra                      \\ \hline
+	\end{tabular}}
 \end{center}
 
 \paragraph{Workflow tipico:} Per l'utilizzo di una libreria CUDA, il workflow generico è:

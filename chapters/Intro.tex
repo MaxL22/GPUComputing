@@ -52,11 +52,65 @@ L'ambito di utilizzo del parallelismo dato dalle GPU è con \textbf{dimensioni d
 \paragraph{SIMT Model:} Modello Single Instruction Multiple Thread, introdotto da CUDA. Ogni thread ha la possibilità di "scegliere una strada" in base al dato. Il flusso di controllo parallelo parte assieme ma può portare a branch differenti, in base ai dati. Estende il concetto di SIMD permettendo flussi individuali per ogni thread, con il costo relativo a gestire la decisione locale sui thread (program counter e registri).
 \label{par:simt}
 
+Le caratteristiche del modello SIMT che non troviamo all'interno di SIMD sono: 
+\begin{itemize}
+	\item Ogni thread ha il proprio instruction address counter
+	
+	\item Ogni thread ha il proprio register state e in generale un register set 
+	
+	\item Ogni thread può avere un execution path indipendente
+\end{itemize}
+
 \subsection{Architettura Nvidia}
 
 \paragraph{Streaming Multiprocessor SM:} Le GPU sono costituite di array di SM, ognuno dei quali composto da gruppi di 32 CUDA core, chiamati \textbf{warp}. Ogni SM in una GPU è progettato per supportare l'esecuzione concorrente di centinaia di thread. In un warp tutti i thread dovrebbero essere SIMD, ovvero eseguire la stessa istruzione allo stesso tempo.
 
 Questo è il modello iniziale, nel tempo si è evoluto aggiungendo elementi come una gerarchia di cache migliorata, altri core dedicati ad applicazioni specifiche (ad esempio, i tensor core per il calcolo matriciale). Ogni CUDA core ha i suoi registri e unità di calcolo (FP e INT).
+
+All'interno di un SM troviamo quindi:
+\begin{itemize}
+	\item \textbf{Warp scheduler}: da 2 a 4, scelgono, ad ogni ciclo di clock, quale warp "pronto" mandare in esecuzione
+
+	\item \textbf{Dispatch unit}: invia le istruzioni del warp selezionato ai vari execution unit (ALU, SFU, load/store)
+
+	\item \textbf{CUDA Cores}: ALU scalari a 32 bit
+
+	\item \textbf{Special Function Units SFU}: usate per calcoli complessi
+
+	\item \textbf{Tensor Cores}: presenti da Volta in poi, unità specializzate per operazioni matriciali
+
+	\item \textbf{Load/Store Units LSU}: per la gestione delle operazioni di lettura/scrittura dalla shared memory e cache L1
+	
+	\item \textbf{Register file}: insieme dei registri per ogni thread; la dimensione globale limita il numero di thread residenti
+	
+	\item \textbf{Shared memory/L1 Cache}: Regione di memoria condivisa tra i thread del block, a bassa latenza
+	
+	\item \textbf{L2 Cache}: Condivisa fra tutti gli SM; gestisce traffico verso memoria globale
+\end{itemize}
+
+L'organizzazione a livello di parallelismo, dal basso verso l'alto, è:
+\begin{itemize}
+	\item \textbf{Thread}: ogni SM esegue migliaia di thread in modalità time-multiplex.
+	
+	\item \textbf{Warp}: gruppi di 32 thread eseguiti in lock-step (Single Instruction, Multiple Threads).
+	
+	\item \textbf{Block}: un blocco (block) di CUDA threads viene schedulato su uno SM fino a quando non termina o subisce uno swap out.
+	
+	\item \textbf{Grid}: collezione di blocchi distribuiti sui vari SM.
+\end{itemize}
+
+Ogni \textbf{CUDA Core} all'interno degli SM è una unità scalare che esegue operazioni aritmetico-logiche sui dati. Ogni core di questo tipo implementa:
+\begin{itemize}
+	\item Pipeline di esecuzione scalare: FP e INT Unit
+	
+	\item Unità di decode e dispatch: riceve l'istruzione dal warp scheduler, ne effettua il decode e la invia al datapath corretto
+	
+	\item Operand Fetch \& Write-Back: I dati (operand) vengono letti dai registri, elaborati, poi scritti nuovamente all'interno dei registri o inoltrati alle unità di memoria (per \texttt{store})
+\end{itemize}
+
+In generale, ogni 32 core (warp) devono eseguire la stessa istruzione, ognuno sul proprio dato, con i propri registri. 
+
+Sono privi di cache proprie, si appoggiano ai registri condivisi e alle cache.
 
 \paragraph{Compute Capability CC:} Rappresenta la versione dell'architettura CUDA supportata da una GPU Nvidia. Definisce le funzionalità hardware disponibili, come il numero di core CUDA, il supporto per le istruzioni avanzate, uso della memoria, risorse, ecc. Viene usato in fase di compilazione per determinare l'architettura per cui compilare.
 

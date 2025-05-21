@@ -33,8 +33,6 @@ Esempio di \textbf{processing flow}:
 	\item Al termine della computazione i risultati vengono copiati da GPU a CPU
 \end{itemize}
 
-\newpage
-
 La "ricetta" base per cucinare in CUDA:
 \begin{enumerate}
 	\item Setup dei dati su host (CPU-accessible memory)
@@ -71,6 +69,14 @@ Grid e block possono avere 1, 2 o 3 dimensioni. Sono possibili 9 combinazioni, m
 Tutti i blocchi devono essere uguali, in struttura e numero di thread. La griglia replica blocchi tutti uguali.
 
 In qualsiasi caso, in \textbf{ogni blocco} ci possono essere \textbf{al più 1024 thread}; esempi di dimensioni: $(1024, 1, 1)$  o $(32, 16, 2)$. Il totale non può superare 1024.
+
+\paragraph{Mapping logico-fisico dei thread:} Ragionando su come sono i thread sono organizzati e su come è composta la GPU, si può pensare al seguente mapping:
+
+\begin{tabular}{r c l}
+	Thread & $\rightarrow$ & CUDA Core \\
+	Thread block & $\rightarrow$ & SM \\
+	Grid & $\rightarrow$ & Device (GPU)
+\end{tabular}
 
 \paragraph{Thread block:} Un blocco di thread è un gruppo di thread che possono cooperare tra loro mediante:
 \begin{itemize}
@@ -220,6 +226,21 @@ Il numero di blocchi e warp che possono essere elaborati insieme su un SM per un
 
 Ogni architettura ha i suoi vincoli e noi vogliamo avvicinarci il più possibile ai limiti massimi, in modo da rendere il più efficiente possibile il programma. C'è un numero massimo di thread/blocchi/warp per SM, vogliamo fare in modo di avere l'utilizzo maggiore possibile.
 
+Un warp attivo può essere di 3 tipi: 
+\begin{itemize}
+	\item Selezionato: in esecuzione su un dato path
+	
+	\item Bloccato: non pronto all'esecuzione
+	
+	\item Candidato: può essere il prossimo ad andare in esecuzione
+\end{itemize}
+
+\paragraph{Warp Divergence:} Tutti i thread all'interno di un warp devono eseguire la stessa istruzione, quindi se sono presenti path diversi  (per esempio per un \texttt{if}) si ha una \textit{divergenza}. 
+
+Quando all'interno di un warp è presente divergenza, i molteplici path di esecuzione presenti vanno eseguiti in serie: i path vengono eseguiti uno dopo l'altro, disabilitando i thread non appartenenti a quel flusso di esecuzione.
+
+Questo porta ad un peggioramento delle prestazioni fino a 32 volte. Da notare che questo fenomeno avviene solo all'interno del warp, non vale per thread di warp differenti.
+
 \paragraph{Latency Hiding:} La "latenza" è il numero di cicli necessari al completamento di un'istruzione. Per massimizzare il throughput occorre che lo scheduler abbia sempre warp eleggibili a ogni ciclo di clock. Si ha così latency hiding scambiando la computazione tra warp.
 
 Tipi di istruzioni che inducono latenza: 
@@ -261,9 +282,59 @@ La sincronizzazione a livello di blocco va usata con attenzione, può anche port
 
 Il compilatore ha tecniche di ottimizzazione per evitare divergenza all'interno del warp (es: per un \texttt{if} calcola entrambi i branch).
 
-%Manca par reduction s39-50?
+\subsection{Parallel reduction}
 
-\newpage
+Un'operazione comune che va sotto il nome di \textbf{reduction} è la somma di elementi di array, solitamente di grandi dimensioni. 
+
+Per un operatore di reduction le proprietà richieste sono commutatività e associatività; con queste gli elementi possono essere riordinati e combinati in qualsiasi modo.
+
+L'approccio sequenziale è molto semplice, in parallelo un'idea potrebbe essere:
+\begin{itemize}
+	\item Suddividere il vettore in parti più piccole
+	
+	\item Attivare i thread per la somma parziale sui pezzi 
+	
+	\item Sommare tra loro i risultati parziali ottenuti
+\end{itemize}
+
+Questo approccio si può implementare in due modi:
+\begin{itemize}
+	\item sommando le coppie di elementi contigui: al passaggio $i$ il thread \texttt{tid} somma valori a distanza $2^i$: \texttt{A[tid] + A[tid + $2^i$]}
+	
+	\item sommando coppie di elementi equispaziati (stride): al passaggio $i$ il thread \texttt{tid} somma elementi a distanza \texttt{len(A)/$2^{i+1}$}: \texttt{A[tid] + A[tid + len(A)/$2^{i+1}$]}
+\end{itemize}
+
+Queste presupponendo che la lunghezza del vettore sia una potenza di 2 e che $i$ parta da 0.
+
+\paragraph{Somma strided:} La strategia parallela è simile alla somma ricorsiva con stride: 
+\begin{itemize}
+	\item Ad ogni passo un numero di thread pari alla metà degli elementi effettua le somme parziali (riduzione)
+	
+	\item Il numero di thread attivi si dimezza ad ogni passo (rinnovare la stride)
+	
+	\item Occorre sincronizzare il comportamento dei thread affinché al passo \texttt{t} abbiano tutti terminato il compito prima di andare al passo \texttt{t+1} (analogo alla chiamata ricorsiva) 
+\end{itemize}
+
+Un possibile codice:
+\begin{minted}{c}
+for (int stride = 1; stride < blockDim.x; stride *= 2) {
+	if ((tid % (2 * stride)) == 0)
+		idata[tid] += idata[tid + stride];
+}
+\end{minted}
+
+Questa soluzione può introdurre divergenza crescente a livello di warp: i thread attivi sono "distanti" a livello di warp, nel primo passo si attivano solo i thread con indici pari, nella seconda iterazione solo la metà pari degli indici precedenti (un quarto dei thread), \dots
+
+Vogliamo eliminare la divergenza, fondamentalmente usando thread adiacenti (quindi all'interno dello stesso warp): "convertiamo" gli indici in modo da usare sempre i \texttt{tid} più bassi possibili:
+\begin{minted}{c}
+for (int stride = 1; stride < blockDim.x; stride *= 2) {
+	int index = 2 * stride * tid;
+	if (index < blockDim.x)
+		idata[index] += idata[index + stride];
+	__syncthreads();
+\end{minted}
+
+Da notare come viene eliminata la clausola \texttt{if} in tutti i thread. La locazione delle somme parziali non cambia, viene modificato solo l'indice dei thread.
 
 \subsection{Operazioni Atomiche}
 
@@ -409,8 +480,6 @@ Ci sono sempre problemi di bordo: cosa faccio quando la maschera considerata arr
 \paragraph{Tiling:} Divido i dati in blocchi (ad esempio, 16 elementi in 4 blocchi da 4 thread), ogni thread nel blocco fa un prodotto della convoluzione. Per ridurre l'accesso alla global memory, in cache/memoria condivisa si tengono i dati a cui l'accesso è fatto più frequentemente, ovvero i valori del "blocco di dati" assegnato al block (tutti i thread devono calcolare sullo stesso insieme di dati, o quasi), tenendo conto della dimensione della maschera (serve avere i dati "adiacenti" al blocco (sarebbe molto utile un'immagine, si capirebbe subito)).
 
 I dati da caricare in smem sono più dei thread nel blocco ("alone" che va al di fuori del blocco di dati stesso); in smem carico tutti i possibili dati a cui il blocco deve fare l'accesso. Chi carica che dati in memoria? I dati esterni al blocco potrebbero essere anche più del blocco stesso (maschera "grossa"). La soluzione è dare un ordine ai thread e dividere il più equamente possibile i caricamenti in memoria tra i thread del blocco.
-
-\newpage
 
 \subsection{Global Memory}
 
@@ -604,3 +673,31 @@ L1/L2 cache rappresenta il default path. Il fatto che un'operazione di \texttt{l
 \paragraph{Scritture:} Le write vengono servite in modo diverso, non viene usata la cache L1, ma le \texttt{store} sono cachate solo in L2, prima di essere inviate alla device memory in segmenti da 32 byte; vengono trasferiti 1,2 o 4 segmenti alla volta.
 
 Quando forzati a fare accessi (letture/scritture) non coalescenti si può usare la shared memory come "passaggio" per rendere le operazioni effettive in memoria coalescenti.
+
+\paragraph{AoS vs SoA:} I dati possono essere divisi in: 
+\begin{itemize}
+	\item \textbf{Array of Structures AoS}:
+	\begin{minted}{c}
+struct Particle { float x, y, z; };
+Particle* P;
+float x = P[idx].x;  // stride = sizeof(Particle)
+	\end{minted}
+	Questo porta a distanza tra accessi (stride) alta, rompendo la coalescenza
+	
+	\item \textbf{Structure of Arrays SoA}:
+	\begin{minted}{c}
+float *Px, *Py, *Pz;
+float x = Px[idx];   // stride = 1
+	\end{minted}
+	In questo modo lo stride è ridotto, riducendo così il numero di transazioni necessarie
+\end{itemize}
+
+\paragraph{TL;DR:} Un warp può effettuare accessi
+\begin{itemize}
+	\item coalescenti: i 32 thread leggono dati contigui, massima efficienza
+	\item non coalescenti/strided: dati a distanza $>1$, possono servire più transazioni per la stessa quantità di dati, fino a 32 diverse
+\end{itemize}
+
+In generale (per CC superiori a 2) le transazioni coprono 128 byte. All'interno di un singolo segmento da 128 byte, la memoria è organizzata in "banks" (4 da 32 byte solitamente), anche se un thread legge solo 4 byte, dovrà trasferire l'intero bank.
+
+La cache L1 serve load/store anche con granularità a 32 byte.
