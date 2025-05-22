@@ -20,8 +20,14 @@
 \setminted[c]{linenos, bgcolor=bg}
 \setminted[python]{linenos, bgcolor=bg}
 \setminted[java]{bgcolor=bg}
+\usepackage{tikz}
+\usetikzlibrary{trees, arrows.meta, positioning, calc}
+
+\tikzstyle{block} = [draw, rectangle, minimum height=2em, minimum width=3em]
 
 \renewcommand{\contentsname}{Indice}
+
+\newcommand{\np}{\mathcal{NP}}
 
 \begin{document}
 	\maketitle
@@ -37,6 +43,8 @@
 	\include{chapters/opt}
 	
 	\include{chapters/python}
+    
+    \include{chapters/pattern}
 
 \end{document}
 

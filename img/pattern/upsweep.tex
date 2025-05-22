@@ -1,0 +1,28 @@
+\begin{tikzpicture}[
+    level 1/.style={sibling distance=50mm},
+    level 2/.style={sibling distance=25mm},
+    level 3/.style={sibling distance=13mm},
+    scale=0.7
+    ]
+    
+    \node {1,2,3,4}
+    child {
+        node {1,2}
+        child {
+            node {1}
+        }
+        child {
+            node {2}
+        }
+    }
+    child {
+        node {3,4}
+        child {
+            node {3}
+        }
+        child {
+            node {4}
+        }
+    };
+    \draw[-{Latex[length=4mm, width=2mm]}] (5.5,-3.25) -- ++(0,3.5);
+\end{tikzpicture}

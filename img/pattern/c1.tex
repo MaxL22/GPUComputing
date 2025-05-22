@@ -1,0 +1,18 @@
+\begin{tikzpicture}[scale=0.7]
+    % Draw horizontal lines for x and y
+    \draw (-1,1) -- (1,1); % Line for x
+    \draw (-1,0) -- (1,0); % Line for y
+    
+    % Draw vertical line connecting the comparator
+    \draw (0,1.15) -- (0,-0.15);
+    
+    % Draw circles
+    \draw (0,1) circle (0.15);
+    \draw (0,0) circle (0.15);
+    
+    % Labels
+    \node[left] at (-1,1) {$x$};
+    \node[left] at (-1,0) {$y$};
+    \node[right] at (1,1) {$x' = \min\{x, y\}$};
+    \node[right] at (1,0) {$y' = \max\{x, y\}$};
+\end{tikzpicture}
