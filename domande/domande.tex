@@ -1,6 +1,6 @@
 % !TeX spellcheck = it_IT
 \documentclass[12pt, answers]{exam}
-\usepackage[italian]{babel}
+%\usepackage[italian]{babel}
 
 \usepackage{xcolor}
 \definecolor{bg}{rgb}{0.95,0.95,0.95}
@@ -9,17 +9,16 @@
 \setminted[c]{bgcolor=bg}
 \setminted[python]{linenos, bgcolor=bg}
 \setminted[java]{bgcolor=bg}
+\usepackage[autostyle, english = american]{csquotes}
+\MakeOuterQuote{"}
 
 % TODO: Domande trovate (fuori da Notion)
 %- 
-%- Come si distingue SIMT di CUDA da SIMD. Fare un esempio in cui CUDA si comporta in maniera SIMD
-%-meccanismi di sincronizzazione tra gpu e modalità di trasmissione tra queste
-%-spiegare la warp divergence e come ovviarla nel caso della reduction
-%-mostrare l'architettura di un sm
-%-quali sono i livelli di sincronizzazione
-%-spiegare la bitonic merge network
-%-mostrare il pseudo codice dell'algoritmo di boruvka
-%-come usare la shared per le convoluzioni
+%- spiegare la warp divergence e come ovviarla nel caso della reduction
+%- mostrare l'architettura di un sm
+%- spiegare la bitonic merge network
+%- mostrare il pseudo codice dell'algoritmo di boruvka
+%- come usare la shared per le convoluzioni
 %- Fare uno schema di una BFS parallela
 %- Fare uno schema di un bitonic merge network
 %- Parallelismo dinamico
@@ -51,6 +50,7 @@
 \begin{questions}
     
     \question Quali sono i meccanismi di sincronizzazione?
+    
     \begin{solution}
         Si possono avere più \textbf{livelli di sincronizzazione}:
         % 
@@ -123,16 +123,55 @@ cudaError_t cudaStreamWaitEvent(
     \end{solution}
     
     \question Cosa sono local e constant memory?
+    
     \begin{solution}
         In CUDA è presente una gerarchia di memorie, con diversi tipi di memoria al suo interno, ciascuno con dimensioni, banda e scopi specifici. 
         
-        %TODO
         Local e constant memory sono due tipi di memoria programmabile esposti al programmatore: 
         \begin{itemize}
-            \item \textbf{Memoria locale}:
+            \item \textbf{Local memory}: memoria off-chip (quindi molto lenta), locale ai thread; risiede in global memory. Da CC 2.0 parti di questa sono in cache L1 e L2.
             
-            \item \textbf{Memoria costante}:
+            Viene usata per variabili "grandi" (o la cui dimensione non è nota a compile time), oltre che per lo spilling dei registri (quando il kernel usa troppe variabili).
+            
+            \item \textbf{Constant memory}: si tratta di uno spazio di memoria di sola lettura, accessibile da tutti i thread. La si può dichiarare usando il qualificatore \texttt{\_\_constant\_\_}. Sono 64k per tutte le CC off-chip, con 8k di cache dedicata in ogni SM. Ha scope globale va dichiarata staticamente al di fuori dei kernel.
+            
+            Viene usata quando tutti i thread devono leggere dalla stessa locazione (raggiunge l'efficienza dei registri); in altri casi le performance sono significativamente minori.
         \end{itemize}
+        
+        In sintesi: local memory è lenta, serve quando registri e shared memory non bastano, la constant memory è una zona di sola lettura, ideale per accessi broadcast a piccole tabelle condivise.
+    \end{solution}
+    
+    \question Come si distingue SIMT di CUDA da SIMD? Fare un esempio in cui CUDA si comporta in maniera SIMD.
+    
+    \begin{solution}
+        \paragraph{Single Instruction Multiple Data SIMD:} Si tratta di un modello in cui, secondo la tassonomia di Flynn, sono presenti più unità di elaborazione e tutte eseguono lo stesso flusso di istruzioni, ciascuna operando su dati diversi.  
+        
+        \paragraph{Single Instruction Multiple Thread SIMT:} Modello introdotto da CUDA che estende SIMD, fornendo a ogni unità di esecuzione (thread) la possibilità di divergere dalle altre, in base ai dati. 
+        
+        Il flusso di controllo parte parallelo, ma, in base ai dati, ogni thread può intraprendere un flusso diverso. Per fare ciò è necessario che ogni unità di esecuzione possieda un program counter e register set. 
+        
+        Oltre al costo "architetturale", si ha un costo in termini di performance quando si incontra una divergenza (i path di esecuzione non sono allineati).
+        
+        Quando tutti i thread eseguono la stessa istruzione, senza divergenze, il modello SIMT si comporta ugualmente a quello SIMD: si ha un'unica istruzione su dati diversi in parallelo.
+        
+        Banalmente, qualsiasi codice senza possibilità di divergenze si comporta come SIMD
+        \begin{minted}{c}
+__global__ void vectorAdd(const float* A, const float* B, 
+    float* C, int N) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i < N) {
+            C[i] = A[i] + B[i];
+        }
+    }
+        \end{minted}
+        In questo modo tutti i thread all'interno di un warp eseguono la stessa istruzione.
+    \end{solution}
+    
+    \question Meccanismi di sincronizzazione tra GPU e modalità di trasmissione tra queste
+    
+    \begin{solution}
+        % Sincronizzazione tramite eventi, sincr implicita per trasferimenti, sincr tramite CPU
+        % Trasferimenti con CPU in mezzo e Peer to Peer
     \end{solution}
 \end{questions}
 
