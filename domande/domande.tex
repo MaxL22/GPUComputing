@@ -12,231 +12,60 @@
 \usepackage[autostyle, english = american]{csquotes}
 \MakeOuterQuote{"}
 
+\title{GPU Computing}
+\author{Massimo Perego}
+\date{}
+
+\renewcommand{\contentsname}{Sezioni}
+
 % TODO: Domande trovate (fuori da Notion)
+
 %- spiegare la bitonic merge network
-%- mostrare il pseudo codice dell'algoritmo di boruvka
-%- come usare la shared per le convoluzioni
-%- Fare uno schema di una BFS parallela
 %- Fare uno schema di un bitonic merge network
-%- Parallelismo dinamico
+%- mostrare il pseudo codice dell'algoritmo di boruvka
+%- Fare uno schema di una BFS parallela
+%- pseudocodice di jones-plassman per la colorazione parallela
+%- schema per l'implementazione work efficient della prefix sum
+
+%- come usare la shared per le convoluzioni
 %- Modalità di accesso alla device memory e performance
 %- Memorie statiche e dinamiche
-%- Pseudocodice utilizzo di curand per simulare il lancio di N dadi
-%- Sincronizzazione tra più devices che condividono lo stesso bus
-%- 
-%- Ciclo di vita dei thread e organizzazione gerarchica
-%- Sincronizzazione a due livelli di CUDA
 %- Significato e uso della memoria unificata
-%- Esempio e vantaggi di loop unrolling
-%- cos'è la scalabilità, come vengono misurati i tempi e lo speedup
-%- cos'è la divergenza e qual è la sua relazione con la sincronizzazione a livello di blocco
-%- cosa sono i warp in simt e qual è la loro utilità
 %- significato e utilità di pattern di accesso alla memoria globale
 %- pseudocodice del trasferimento in memoria shared per il prodotto matriciale 
-%- pseudocodice di jones-plassman per la colorazione parallela
+
+%- Sincronizzazione tra più devices che condividono lo stesso bus
+%- Sincronizzazione a due livelli di CUDA
+%- cos'è la divergenza e qual è la sua relazione con la sincronizzazione a livello di blocco
+
+%- Ciclo di vita dei thread e organizzazione gerarchica
+%- cosa sono i warp in simt e qual è la loro utilità
+
+%- Esempio e vantaggi di loop unrolling
+
+%- cos'è la scalabilità, come vengono misurati i tempi e lo speedup
+
 %- uso degli stream per il prodotto di matrici diagonali a blocchi
-%- schema di uso per la libreria cublas
-%- schema per l'implementazione work efficient della prefix sum
-%- cosa sono le memorie pinned, zero copy e unified
-%- schema di utilizzo di più gpu, ad esempio per la somma di due vettori
+
 %- cosa sono le operazioni atomiche e come vengono usate per il calcolo dell'istogramma di immagini RGB
 
-\begin{document}
-\section*{GPU Computing}
+% Domande in dubbio (non so se ha spiegato quest'anno, le chiede?)
+%- schema di utilizzo di più gpu, ad esempio per la somma di due vettori
 
-\begin{questions}
+\begin{document}
     
-    \question Quali sono i meccanismi di sincronizzazione?
+\maketitle
+
+\tableofcontents
+
+\newpage
     
-    \begin{solution}
-        Si possono avere più \textbf{livelli di sincronizzazione}:
-        \begin{itemize}
-            \item \textbf{Livello di sistema}: per attendere che un dato task venga completato su host e device; la primitiva
-            \begin{minted}{c}
-cudaError_t cudaDeviceSynchronize(void);
-            \end{minted}
-            blocca l'applicazione host finché tutte le operazioni CUDA su tutti gli stream non sono completate. Si tratta di una funzione host-side only (una volta usata lato device per gestire il parallelismo dinamico, ma ora deprecata);
-            
-            \item Non c'è una primitiva esplicita per la sincronizzazione a \textbf{livello di grid}, ma la si può ottenere (da CC 6 in avanti) lanciando un kernel cooperativo
-            \begin{minted}{c}
-cudaLaunchCooperativeKernel(
-    (void*)myKernel,
-    gridDim, blockDim,
-    kernelArgs, /*sharedMemBytes=*/0, /*stream=*/0);
-            \end{minted}
-            e all'interno del kernel
-            \begin{minted}{c}
-grid_group grid = this_grid();
-// work work work ...
-// waits for _all_ blocks in *this* kernel
-grid.sync();
-            \end{minted}
-            Non ci devono essere ulteriori kernel attivi all'interno del device;
-            
-            \item \textbf{Livello di blocco}: per attendere che tutti i thread in un blocco raggiungano lo stesso punto di esecuzione. La primitiva
-            \begin{minted}{c}
-__device__ void __syncthreads(void);
-            \end{minted}
-            impone a tutti i thread nel blocco corrente di attendere fino a quando tutti gli altri thread dello stesso blocco non hanno raggiunto quel particolare punto di esecuzione. Lo scopo principale è garantire la visibilità degli accessi alla memoria (rendere visibile le modifiche), in modo da evitare conflitti e race conditions. Se non tutti i thread all'interno del blocco arrivano alla primitiva si può avere un deadlock;
-            
-            \item \textbf{Livello di warp}: per attendere che tutti i thread all'interno di un warp raggiungano lo stesso punto di esecuzione. La primitiva
-            \begin{minted}{c}
-__device__ void __syncwarp(mask);
-            \end{minted}
-            permette di avere una barriera esplicita per garantire la ri-convergenza del warp per le istruzioni successive. L'argomento \texttt{mask} è composto da una sequenza di 32 bit che permette di definire quali warp partecipano alla sincronizzazione (se omessa, di default tutti, ovvero \texttt{0xFFFFFFFF}).
-        \end{itemize}
-        
-        Sincronizzazione \textbf{tramite stream}: tra stream non-NULL diversi non si ha nessuna dipendenza od ordinamento, mentre lo stream di default (\texttt{0}) ha un comportamento diverso, può essere: 
-        \begin{itemize}
-            \item legacy: bloccante rispetto a tutti gli altri stream, un'operazione lanciata nel default stream non può iniziare finché non sono completate tutte le operazioni precedenti in qualsiasi altro stream (e viceversa);
-            
-            \item per-thread: disponibile da CUDA 7, ogni thread host ottiene il suo default stream, diventa non-bloccante rispetto agli altri stream
-        \end{itemize}
-        
-        Sincronizzazione \textbf{tramite eventi}: all'interno degli stream si possono creare degli eventi tramite i quali è possibile avere anche sincronizzazione:
-        \begin{itemize}
-            \item Host-side: la primitiva
-            \begin{minted}{c}
-cudaError_t cudaEventSynchronize(cudaEvent_t event);
-            \end{minted}
-            permette di attendere lato host finché l'evento specificato non viene completato; esiste una variante non-bloccante:
-            \begin{minted}{c}
-cudaError_t cudaEventQuery(cudaEvent_t event)
-            \end{minted}
-            che permette di controllare se un evento è stato completato o meno, senza bloccare l'host;
-            
-            \item Stream-to-stream: per far attendere a uno stream il completamente di un evento su un altro stream. La primitiva:
-            \begin{minted}{c}
-cudaError_t cudaStreamWaitEvent(
-    cudaStream_t stream , cudaEvent_t event);
-            \end{minted}
-            permette di aspettare un evento su un altro stream (anche su altri device).
-        \end{itemize}
-        
-        Sincronizzazione \textbf{implicita} dovuta a operazioni bloccanti: alcune operazioni causano sincronizzazione in quanto implicano un blocco su tutte le operazioni precedenti sul device corrente. In questo gruppo rientrano molte operazioni relative alla gestione della memoria.
-        
-        %Ignorerà le primitive di sincronizzazione dei cooperative groups, non spiegate?
-    \end{solution}
-    
-    \question Cosa sono local e constant memory?
-    
-    \begin{solution}
-        In CUDA è presente una gerarchia di memorie, con diversi tipi di memoria al suo interno, ciascuno con dimensioni, banda e scopi specifici. 
-        
-        Local e constant memory sono due tipi di memoria programmabile esposti al programmatore: 
-        \begin{itemize}
-            \item \textbf{Local memory}: memoria off-chip (quindi molto lenta), locale ai thread; risiede in global memory. Da CC 2.0 parti di questa sono in cache L1 e L2.
-            
-            Viene usata per variabili "grandi" (o la cui dimensione non è nota a compile time), oltre che per lo spilling dei registri (quando il kernel usa troppe variabili).
-            
-            \item \textbf{Constant memory}: si tratta di uno spazio di memoria di sola lettura, accessibile da tutti i thread. La si può dichiarare usando il qualificatore \texttt{\_\_constant\_\_}. Sono 64k per tutte le CC off-chip, con 8k di cache dedicata in ogni SM. Ha scope globale va dichiarata staticamente al di fuori dei kernel.
-            
-            Viene usata quando tutti i thread devono leggere dalla stessa locazione (raggiunge l'efficienza dei registri); in altri casi le performance sono significativamente minori.
-        \end{itemize}
-        
-        In sintesi: local memory è lenta, serve quando registri e shared memory non bastano, la constant memory è una zona di sola lettura, ideale per accessi broadcast a piccole tabelle condivise.
-    \end{solution}
-    
-    \question Come si distingue SIMT di CUDA da SIMD? Fare un esempio in cui CUDA si comporta in maniera SIMD.
-    
-    \begin{solution}
-        \textbf{Single Instruction Multiple Data SIMD:} Si tratta di un modello in cui, secondo la tassonomia di Flynn, sono presenti più unità di elaborazione e tutte eseguono lo stesso flusso di istruzioni, ciascuna operando su dati diversi.  
-        
-        \textbf{Single Instruction Multiple Thread SIMT:} Modello introdotto da CUDA che estende SIMD, fornendo a ogni unità di esecuzione (thread) la possibilità di divergere dalle altre, in base ai dati. 
-        
-        Il flusso di controllo parte parallelo, ma, in base ai dati, ogni thread può intraprendere un flusso diverso. Per fare ciò è necessario che ogni unità di esecuzione possieda un program counter e register set. In realtà, all'interno di CUDA, il PC è uno per ogni warp (gruppo di 32 thread), i quali eseguono le istruzioni in lock-step e nel caso di divergenza i diversi path vanno eseguiti serialmente.
-        
-        Oltre al costo "architetturale", si ha un costo in termini di performance quando si incontra una divergenza (i path di esecuzione non sono allineati).
-        
-        Quando tutti i thread eseguono la stessa istruzione, senza divergenze, il modello SIMT si comporta ugualmente a quello SIMD: si ha un'unica istruzione su dati diversi in parallelo.
-        
-        Banalmente, qualsiasi codice senza possibilità di divergenze si comporta come SIMD
-        \begin{minted}{c}
-__global__ void vectorAdd(const float* A, const float* B, 
-    float* C, int N) {
-        int i = blockIdx.x * blockDim.x + threadIdx.x;
-        if (i < N) {
-            C[i] = A[i] + B[i];
-        }
-    }
-        \end{minted}
-        In questo modo tutti i thread all'interno di un warp eseguono la stessa istruzione.
-    \end{solution}
-    
-    \question Meccanismi di sincronizzazione tra GPU e modalità di trasmissione tra queste.
-    
-    \begin{solution}
-        Tra diverse GPU ci sono più metodi di \textbf{sincronizzazione} possibili: 
-        \begin{itemize}
-            \item Il metodo più semplice è lasciare che sia l'host a sincronizzare tutte le GPU, la primitiva \texttt{cudaDeviceSynchronize()} permette di attendere il completamento di tutte le operazioni su tutte le GPU (il comando va ripetuto per ogni device)
-            
-            \item Per una gestione più flessibile si possono usare gli eventi CUDA; un evento è un marcatore all'interno di una stream su un device, un'altra GPU può "ascoltare" per attendere il completamento di un evento su un altro device, tramite \texttt{cudaStreamWaitEvent()} (bloccante) o \texttt{cudaStreamQueryEvent()} (non bloccante)
-            
-            \item La libreria NCCL (Nvidia Collective Communications Library) fornisce primitive di comunicazione con sincronizzazione implicita
-        \end{itemize}
-        
-        Anche per \textbf{trasmettere dati} tra più GPU ci sono diverse modalità:
-        \begin{itemize}
-            \item La più semplice è via host: i dati vengono copiati sull'host e poi passati ai device a cui servono (tramite \texttt{cudaMemcpy()})
-            
-            \item Se il P2P è abilitato, esistono primitive che permettono lo scambio dati tra GPU diverse, come ad esempio \texttt{cudaMemcpyPeer()}; esistono anche primitive asincrone come \texttt{cudaMemcpyAsync()} e \texttt{cudaMemcpyPeerAsync()}
-            
-            \item Usare unified memory: la memoria unificata permette di avere uno spazio di indirizzamento condiviso tra host e device, allocando con \texttt{cudaMallocManaged()} si può usare lo stesso puntatore su tutti i dispositivi
-            
-            \item Per primitive di comunicazione altamente ottimizzate per la comunicazione collettiva la libreria NCCL offre throughput elevato e bassa latenza
-        \end{itemize}
-    \end{solution}
-    
-    \question Spiegare la warp divergence e come ovviarla nel caso della reduction.
-    
-    \begin{solution}
-        In CUDA, un warp è un insieme di 32 thread che vengono eseguiti sullo stesso Streaming Multiprocessor SM; la warp divergence si ha quando thread all'interno di uno stesso warp prendono path di esecuzione differenti (causa istruzioni di controllo condizionale).
-        
-        Quando c'è una divergenza, all'interno di un warp, l'hardware deve serializzare i path di esecuzione, eseguendoli uno dopo l'altro, ogni volta disabilitando i thread che non devono entrare in quel ramo di esecuzione. Riduce il parallelismo all'interno del warp, degradando, anche significativamente le prestazioni.
-        
-        Per la parallel reduction, l'approccio "naive" consiste nell'imitare la somma strided ricorsiva: al passaggio $i$ si sommano elementi a distanza $2^i$; in parallelo, questo attiverebbe 1 thread ogni $2^{i+1}$, causando divergenza crescente (a ogni step si usano la metà dei thread precedenti, divisi sullo stesso numero di warp).
-        
-        Per risolvere questo problema vogliamo usare thread adiacenti per fare le somme, "disaccoppiando" l'indice del dato dall'indice del thread. Calcoliamo l'indice del dato di cui si deve occupare ogni thread come \texttt{2*stride*tid}, in questo modo thread adiacenti si occupano di tutte le somme, rimuovendo la divergenza (i thread che andrebbero oltre la dimensione dell'array vanno disattivati).
-        
-        Riorganizzare i pattern di accesso ai dati per "convertire" gli indici in modo che l'utilizzo dei thread sia allineato alla granularità del warp.
-    \end{solution}
-    
-    \question Mostrare l'architettura di uno SM.
-    
-    \begin{solution}
-        Le GPU sono costituite da array di Streaming Multiprocessor SM, ognuno dei quali è pensato per supportare l'esecuzione concorrente di centinaia di thread. Si divide in gruppi di 32 thread chiamati "warp".
-        
-        Ogni SM al suo interno è composto da: 
-        \begin{itemize}
-            \item CUDA Core: le ALU per le operazioni intere o floating point
-            
-            \item Warp scheduler: a ogni ciclo di clock decidono quali warp sono pronti e possono essere mandati in esecuzione
-            
-            \item Dispatch unit: invia le istruzioni del warp selezionato alle varie execution unit
-            
-            \item Special Function Unit SFU: usate per calcoli complessi, svolti in modo hardware
-            
-            \item Eventuali unità specializzate, come Tensor Core o FP64
-            
-            \item Load/Store Unit LSU: per la gestione delle operazioni di lettura/scrittura in shared memory/cache L1
-            
-            \item Register file: insieme dei registri per i thread di uno SM, la dimensione limita il numero di thread residenti concorrentemente 
-            
-            \item Cache L1/shared memory: memoria condivisa tra i thread del blocco, a bassa latenza
-            
-            \item Cache L2: condivisa tra tutti gli SM, gestisce il traffico verso la memoria globale
-            
-            \item Instruction Cache: per ridurre la latenza dovuta al fetch di istruzioni
-            
-            \item Texture \& constant cache: cache separate per accessi read-only in maniera non sequenziale
-        \end{itemize}
-    \end{solution}
-    
-    \question Spiegare i diversi tipi di stream.
-    
-    \begin{solution}
-        Stream
-    \end{solution}
-\end{questions}
+\input{sections/sinc}
+
+\input{sections/memoria}
+
+\input{sections/arch}
+
+\input{sections/librerie}
 
 \end{document}

@@ -1,0 +1,107 @@
+% !TeX spellcheck = it_IT
+\section{Architettura}
+
+\begin{questions}
+    \question Parallelismo dinamico.
+    
+    \begin{solution}
+        Il parallelismo dinamico è una funzionalità introdotta dalle CC 3.5 che permette a un kernel in esecuzione di lanciare altri kernel, senza passare dall'host. 
+        
+        Elimina la necessità di comunicare con la CPU e permette pattern di programmazione ricorsivi e data-dependent. Si possono generare dinamicamente kernel in base ai dati, senza doverli richiedere alla CPU. Il lavoro può essere adattato in base a decisioni data-driven.
+        
+        Da tenere sotto controllo il numero di kernel lanciati, solitamente non è necessario che ogni thread lanci un nuovo kernel.
+        
+        Si ha una sincronizzazione implicita tra padre e figlio: il padre non può terminare prima del figlio. Rimane la possibilità di avere sincronizzazione esplicita.
+    \end{solution}
+    
+    \question Spiegare i diversi tipi di stream.
+    
+    \begin{solution}
+        Uno stream CUDA è una sequenza di operazioni CUDA asincrone, eseguite nell'ordine fornito dall'host dalla GPU. Ogni stream è asincrono rispetto all'host ed è indipendente rispetto ad altri stream.
+        
+        I tipi di stream sono: 
+        \begin{itemize}
+            \item NULL stream o default stream: si tratta dello stream predefinito, dichiarato implicitamente, usato per i lanci di kernel quando non specificato altrimenti (oppure usando \texttt{0} come parametro). Il suo comportamento varia in base alla flag di compilazione \texttt{--default-stream}
+            \begin{itemize}
+                \item \texttt{legacy}: gli stream NULL sono bloccanti rispetto agli altri stream, quindi le operazioni sullo stream NULL possono essere seguite solo quando hanno terminato tutti gli altri stream e viceversa 
+                
+                \item \texttt{per-thread}: ogni thread host ottiene il suo stream di default e si comportano come stream regolari, non sono bloccanti
+            \end{itemize}
+            
+            \item Stream dichiarati esplicitamente o non-NULL: si possono creare stream tramite primitive come \texttt{cudaStreamCreate()} e \texttt{cudaStreamCreateWithFlags()}. Di default sono indipendenti tra loro e bloccanti rispetto al NULL-stream, ma questo comportamento può essere modificato tramite flag
+        \end{itemize}
+        
+        Si possono anche avere stream con priorità, \texttt{cudaStreamCreateWithPriority()}: uno stream con priorità più alta può prelazionare lavoro in esecuzione con priorità più bassa.
+    \end{solution}
+    
+    \question Mostrare l'architettura di uno SM.
+    
+    \begin{solution}
+        Le GPU sono costituite da array di Streaming Multiprocessor SM, ognuno dei quali è pensato per supportare l'esecuzione concorrente di centinaia di thread. Si divide in gruppi di 32 thread chiamati "warp".
+        
+        Ogni SM al suo interno è composto da: 
+        \begin{itemize}
+            \item CUDA Core: le ALU per le operazioni intere o floating point
+            
+            \item Warp scheduler: a ogni ciclo di clock decidono quali warp sono pronti e possono essere mandati in esecuzione
+            
+            \item Dispatch unit: invia le istruzioni del warp selezionato alle varie execution unit
+            
+            \item Special Function Unit SFU: usate per calcoli complessi, svolti in modo hardware
+            
+            \item Eventuali unità specializzate, come Tensor Core o FP64
+            
+            \item Load/Store Unit LSU: per la gestione delle operazioni di lettura/scrittura in shared memory/cache L1
+            
+            \item Register file: insieme dei registri per i thread di uno SM, la dimensione limita il numero di thread residenti concorrentemente 
+            
+            \item Cache L1/shared memory: memoria condivisa tra i thread del blocco, a bassa latenza
+            
+            \item Cache L2: condivisa tra tutti gli SM, gestisce il traffico verso la memoria globale
+            
+            \item Instruction Cache: per ridurre la latenza dovuta al fetch di istruzioni
+            
+            \item Texture \& constant cache: cache separate per accessi read-only in maniera non sequenziale
+        \end{itemize}
+    \end{solution}
+    
+    \question Spiegare la warp divergence e come ovviarla nel caso della reduction.
+    
+    \begin{solution}
+        In CUDA, un warp è un insieme di 32 thread che vengono eseguiti sullo stesso Streaming Multiprocessor SM; la warp divergence si ha quando thread all'interno di uno stesso warp prendono path di esecuzione differenti (causa istruzioni di controllo condizionale).
+        
+        Quando c'è una divergenza, all'interno di un warp, l'hardware deve serializzare i path di esecuzione, eseguendoli uno dopo l'altro, ogni volta disabilitando i thread che non devono entrare in quel ramo di esecuzione. Riduce il parallelismo all'interno del warp, degradando, anche significativamente le prestazioni.
+        
+        Per la parallel reduction, l'approccio "naive" consiste nell'imitare la somma strided ricorsiva: al passaggio $i$ si sommano elementi a distanza $2^i$; in parallelo, questo attiverebbe 1 thread ogni $2^{i+1}$, causando divergenza crescente (a ogni step si usano la metà dei thread precedenti, divisi sullo stesso numero di warp).
+        
+        Per risolvere questo problema vogliamo usare thread adiacenti per fare le somme, "disaccoppiando" l'indice del dato dall'indice del thread. Calcoliamo l'indice del dato di cui si deve occupare ogni thread come \texttt{2*stride*tid}, in questo modo thread adiacenti si occupano di tutte le somme, rimuovendo la divergenza (i thread che andrebbero oltre la dimensione dell'array vanno disattivati).
+        
+        Riorganizzare i pattern di accesso ai dati per "convertire" gli indici in modo che l'utilizzo dei thread sia allineato alla granularità del warp.
+    \end{solution}
+    
+    \question Come si distingue SIMT di CUDA da SIMD? Fare un esempio in cui CUDA si comporta in maniera SIMD.
+    
+    \begin{solution}
+        \textbf{Single Instruction Multiple Data SIMD:} Si tratta di un modello in cui, secondo la tassonomia di Flynn, sono presenti più unità di elaborazione e tutte eseguono lo stesso flusso di istruzioni, ciascuna operando su dati diversi.  
+        
+        \textbf{Single Instruction Multiple Thread SIMT:} Modello introdotto da CUDA che estende SIMD, fornendo a ogni unità di esecuzione (thread) la possibilità di divergere dalle altre, in base ai dati. 
+        
+        Il flusso di controllo parte parallelo, ma, in base ai dati, ogni thread può intraprendere un flusso diverso. Per fare ciò è necessario che ogni unità di esecuzione possieda un program counter e register set. In realtà, all'interno di CUDA, il PC è uno per ogni warp (gruppo di 32 thread), i quali eseguono le istruzioni in lock-step e nel caso di divergenza i diversi path vanno eseguiti serialmente.
+        
+        Oltre al costo "architetturale", si ha un costo in termini di performance quando si incontra una divergenza (i path di esecuzione non sono allineati).
+        
+        Quando tutti i thread eseguono la stessa istruzione, senza divergenze, il modello SIMT si comporta ugualmente a quello SIMD: si ha un'unica istruzione su dati diversi in parallelo.
+        
+        Banalmente, qualsiasi codice senza possibilità di divergenze si comporta come SIMD
+        \begin{minted}{c}
+ __global__ void vectorAdd(const float* A, const float* B, 
+float* C, int N) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < N) {
+        C[i] = A[i] + B[i];
+    }
+}
+        \end{minted}
+        In questo modo tutti i thread all'interno di un warp eseguono la stessa istruzione.
+    \end{solution}
+\end{questions}

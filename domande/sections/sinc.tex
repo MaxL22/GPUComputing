@@ -1,0 +1,100 @@
+% !TeX spellcheck = it_IT
+\section{Sincronizzazione}
+
+\begin{questions}
+    \question Quali sono i meccanismi di sincronizzazione?
+    
+    \begin{solution}
+        Si possono avere più \textbf{livelli di sincronizzazione}:
+        \begin{itemize}
+            \item \textbf{Livello di sistema}: per attendere che un dato task venga completato su host e device; la primitiva
+            \begin{minted}{c}
+cudaError_t cudaDeviceSynchronize(void);
+            \end{minted}
+            blocca l'applicazione host finché tutte le operazioni CUDA su tutti gli stream non sono completate. Si tratta di una funzione host-side only (una volta usata lato device per gestire il parallelismo dinamico, ma ora deprecata);
+            
+            \item Non c'è una primitiva esplicita per la sincronizzazione a \textbf{livello di grid}, ma la si può ottenere (da CC 6 in avanti) lanciando un kernel cooperativo
+            \begin{minted}{c}
+cudaLaunchCooperativeKernel(
+    (void*)myKernel,
+    gridDim, blockDim,
+    kernelArgs, /*sharedMemBytes=*/0, /*stream=*/0);
+            \end{minted}
+            e all'interno del kernel
+            \begin{minted}{c}
+grid_group grid = this_grid();
+// work work work ...
+// waits for _all_ blocks in *this* kernel
+grid.sync();
+            \end{minted}
+            Non ci devono essere ulteriori kernel attivi all'interno del device;
+            
+            \item \textbf{Livello di blocco}: per attendere che tutti i thread in un blocco raggiungano lo stesso punto di esecuzione. La primitiva
+            \begin{minted}{c}
+__device__ void __syncthreads(void);
+            \end{minted}
+            impone a tutti i thread nel blocco corrente di attendere fino a quando tutti gli altri thread dello stesso blocco non hanno raggiunto quel particolare punto di esecuzione. Lo scopo principale è garantire la visibilità degli accessi alla memoria (rendere visibile le modifiche), in modo da evitare conflitti e race conditions. Se non tutti i thread all'interno del blocco arrivano alla primitiva si può avere un deadlock;
+            
+            \item \textbf{Livello di warp}: per attendere che tutti i thread all'interno di un warp raggiungano lo stesso punto di esecuzione. La primitiva
+            \begin{minted}{c}
+__device__ void __syncwarp(mask);
+            \end{minted}
+            permette di avere una barriera esplicita per garantire la ri-convergenza del warp per le istruzioni successive. L'argomento \texttt{mask} è composto da una sequenza di 32 bit che permette di definire quali warp partecipano alla sincronizzazione (se omessa, di default tutti, ovvero \texttt{0xFFFFFFFF}).
+        \end{itemize}
+        
+        Sincronizzazione \textbf{tramite stream}: tra stream non-NULL diversi non si ha nessuna dipendenza od ordinamento, mentre lo stream di default (\texttt{0}) ha un comportamento diverso, può essere: 
+        \begin{itemize}
+            \item legacy: bloccante rispetto a tutti gli altri stream, un'operazione lanciata nel default stream non può iniziare finché non sono completate tutte le operazioni precedenti in qualsiasi altro stream (e viceversa);
+            
+            \item per-thread: disponibile da CUDA 7, ogni thread host ottiene il suo default stream, diventa non-bloccante rispetto agli altri stream
+        \end{itemize}
+        
+        Sincronizzazione \textbf{tramite eventi}: all'interno degli stream si possono creare degli eventi tramite i quali è possibile avere anche sincronizzazione:
+        \begin{itemize}
+            \item Host-side: la primitiva
+            \begin{minted}{c}
+cudaError_t cudaEventSynchronize(cudaEvent_t event);
+            \end{minted}
+            permette di attendere lato host finché l'evento specificato non viene completato; esiste una variante non-bloccante:
+            \begin{minted}{c}
+cudaError_t cudaEventQuery(cudaEvent_t event)
+            \end{minted}
+            che permette di controllare se un evento è stato completato o meno, senza bloccare l'host;
+            
+            \item Stream-to-stream: per far attendere a uno stream il completamente di un evento su un altro stream. La primitiva:
+            \begin{minted}{c}
+cudaError_t cudaStreamWaitEvent(
+    cudaStream_t stream , cudaEvent_t event);
+            \end{minted}
+            permette di aspettare un evento su un altro stream (anche su altri device).
+        \end{itemize}
+        
+        Sincronizzazione \textbf{implicita} dovuta a operazioni bloccanti: alcune operazioni causano sincronizzazione in quanto implicano un blocco su tutte le operazioni precedenti sul device corrente. In questo gruppo rientrano molte operazioni relative alla gestione della memoria.
+        
+        %Ignorerà le primitive di sincronizzazione dei cooperative groups, non spiegate?
+    \end{solution}
+    
+    \question Meccanismi di sincronizzazione tra GPU e modalità di trasmissione tra queste.
+    
+    \begin{solution}
+        Tra diverse GPU ci sono più metodi di \textbf{sincronizzazione} possibili: 
+        \begin{itemize}
+            \item Il metodo più semplice è lasciare che sia l'host a sincronizzare tutte le GPU, la primitiva \texttt{cudaDeviceSynchronize()} permette di attendere il completamento di tutte le operazioni su tutte le GPU (il comando va ripetuto per ogni device)
+            
+            \item Per una gestione più flessibile si possono usare gli eventi CUDA; un evento è un marcatore all'interno di una stream su un device, un'altra GPU può "ascoltare" per attendere il completamento di un evento su un altro device, tramite \texttt{cudaStreamWaitEvent()} (bloccante) o \texttt{cudaStreamQueryEvent()} (non bloccante)
+            
+            \item La libreria NCCL (Nvidia Collective Communications Library) fornisce primitive di comunicazione con sincronizzazione implicita
+        \end{itemize}
+        
+        Anche per \textbf{trasmettere dati} tra più GPU ci sono diverse modalità:
+        \begin{itemize}
+            \item La più semplice è via host: i dati vengono copiati sull'host e poi passati ai device a cui servono (tramite \texttt{cudaMemcpy()})
+            
+            \item Se il P2P è abilitato, esistono primitive che permettono lo scambio dati tra GPU diverse, come ad esempio \texttt{cudaMemcpyPeer()}; esistono anche primitive asincrone come \texttt{cudaMemcpyAsync()} e \texttt{cudaMemcpyPeerAsync()}
+            
+            \item Usare unified memory: la memoria unificata permette di avere uno spazio di indirizzamento condiviso tra host e device, allocando con \texttt{cudaMallocManaged()} si può usare lo stesso puntatore su tutti i dispositivi
+            
+            \item Per primitive di comunicazione altamente ottimizzate per la comunicazione collettiva la libreria NCCL offre throughput elevato e bassa latenza
+        \end{itemize}
+    \end{solution}
+\end{questions}

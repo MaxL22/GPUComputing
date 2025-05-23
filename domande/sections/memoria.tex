@@ -1,0 +1,33 @@
+% !TeX spellcheck = it_IT
+\section{Memoria}
+
+\begin{questions}
+    \question Cosa sono local e constant memory?
+    
+    \begin{solution}
+        In CUDA è presente una gerarchia di memorie, con diversi tipi di memoria al suo interno, ciascuno con dimensioni, banda e scopi specifici. 
+        
+        Local e constant memory sono due tipi di memoria programmabile esposti al programmatore: 
+        \begin{itemize}
+            \item \textbf{Local memory}: memoria off-chip (quindi molto lenta), locale ai thread; risiede in global memory. Da CC 2.0 parti di questa sono in cache L1 e L2.
+            
+            Viene usata per variabili "grandi" (o la cui dimensione non è nota a compile time), oltre che per lo spilling dei registri (quando il kernel usa troppe variabili).
+            
+            \item \textbf{Constant memory}: si tratta di uno spazio di memoria di sola lettura, accessibile da tutti i thread. La si può dichiarare usando il qualificatore \texttt{\_\_constant\_\_}. Sono 64k per tutte le CC off-chip, con 8k di cache dedicata in ogni SM. Ha scope globale va dichiarata staticamente al di fuori dei kernel.
+            
+            Viene usata quando tutti i thread devono leggere dalla stessa locazione (raggiunge l'efficienza dei registri); in altri casi le performance sono significativamente minori.
+        \end{itemize}
+        
+        In sintesi: local memory è lenta, serve quando registri e shared memory non bastano, la constant memory è una zona di sola lettura, ideale per accessi broadcast a piccole tabelle condivise.
+    \end{solution}
+    
+    \question Cosa sono le memorie pinned, zero copy e unified.
+    
+    \begin{solution}
+        La memoria \textbf{pinned} è memoria host non paginabile dal sistema operativo, ovvero non può essere fatto lo swap su disco di quella zona di memoria. La si può allocare con \texttt{cudaHostAlloc()}, permette trasferimenti asincroni con maggiore throughput rispetto alla memoria paginabile (evita overhead dovuto al pinning temporaneo). Da notare che l'allocazione eccessiva potrebbe degradare le performance host.
+        
+        La memoria \textbf{zero copy} si basa su memoria pinned mappata nello spazio di indirizzamento del device, permette alla GPU di accedere direttamente a pagine di memoria host senza copie esplicite di memoria. Può semplificare la programmazione, ma ha latenza più alta della global memory (i dati devono passare su PCIe) e banda limitata.
+        
+        La memoria \textbf{unified} è un modello di memoria automatico in cui host e device condividono lo spazio di indirizzamento, tutte le CPU e GPU del sistema possono accedere a questa memoria. Il sistema sottostante si occupa di gestire le migrazioni di memoria secondo necessità, in maniera trasparente all'applicazione. Può essere allocata con \texttt{cudaMallocManaged()} e permette di semplificare notevolmente la programmazione, evitando tutte le copie di dati esplicite, ma richiede overhead di migrazione quando viene fatto l'accesso ai dati.
+    \end{solution}
+\end{questions}

@@ -1,0 +1,82 @@
+% !TeX spellcheck = it_IT
+\section{Librerie}
+
+\begin{questions}
+    \question Schema d'uso per la libreria cuBLAS.
+    
+    \begin{solution}
+        La libreria cuBLAS è la versione accelerata su GPU delle routine classiche di algebra lineare, come prodotti di matrici, vettori e scalari.
+        
+        Le funzioni hanno 3 livelli, rispettivamente per operazioni vettore-vettore, matrice-vettore e matrice-matrice.
+        
+        Da notare che lavora in ordine column-major (come Fortran) e non row-major (come C/C++).
+        
+        Uno schema d'uso tipico per usare cuBLAS è:
+        \begin{enumerate}
+            \item Creare un handle con \texttt{cublasCreateHandle()}
+            
+            \item Allocare la memoria sul dispositivo
+            
+            \item Popolare la device memory, ad esempio con \texttt{cublasSetVector()}
+            
+            \item Effettuare le chiamate a libreria per le operazioni necessarie
+            
+            \item Recuperare i dati dalla device memory, ad esempio con \texttt{cublasGetVector()}
+            
+            \item Una volta terminato, rilasciare le risorse CUDA e cuBLAS con \texttt{cudaFree()} e \texttt{cublasDestroy()}
+        \end{enumerate}
+    \end{solution}
+    
+    \question Schema d'uso per la libreria cuRAND.
+    
+    \begin{solution}
+        La libreria cuRAND fornisce semplici generatori di numeri. Permette sequenze pseudo-random e quasi-random. Si compone di due header, la seconda è per generatori su device (opzionale).
+        
+        Uno schema d'uso generico di cuRAND:
+        \begin{enumerate}
+            \item Creare un nuovo generatore del tipo desiderato con \texttt{curandCreateGenerator()}
+            
+            \item Settare i parametri del generatore 
+            
+            \item Allocare la memoria device 
+            
+            \item Generare i valori casuali, ad esempio con \texttt{curandGenerate()}
+            
+            \item Uso dei valori 
+            
+            \item Quando non serve più il generatore, va distrutto con \texttt{curandDestroyGenerator()}
+        \end{enumerate}
+    \end{solution}
+    
+    \question Pseudocodice utilizzo di curand per simulare il lancio di $n$ dadi.
+    
+    \begin{solution}
+        Seguendo l'iter tipico di utilizzo di cuRAND:
+        \begin{minted}{c}
+// Set up di cuRAND
+curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT);
+curandSetPseudoRandomGeneratorSeed(generator, seed_value);
+
+// Allocazione della memoria
+cudaMalloc(&d_raw,    N * sizeof(unsigned int));
+cudaMalloc(&d_dice,   N * sizeof(unsigned char));
+
+// Generazione dei valori
+curandGenerate(generator, d_raw, N);
+
+// Kernel per normalizzare i valori nel range 1-6
+kernel_normalize_values<<<blocks, threads>>>(d_raw, d_dice, N);
+
+// Trasferimento dei valori all'host
+cudaMallocHost(&h_dice, N * sizeof(unsigned char));
+cudaMemcpy(h_dice, d_dice, N * sizeof(unsigned char),
+cudaMemcpyDeviceToHost);
+
+// Clean up
+curandDestroyGenerator(generator);
+cudaFree(d_raw);
+cudaFree(d_dice);
+cudaFreeHost(h_dice);
+        \end{minted}
+    \end{solution}
+\end{questions}
