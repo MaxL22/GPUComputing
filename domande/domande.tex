@@ -13,9 +13,6 @@
 \MakeOuterQuote{"}
 
 % TODO: Domande trovate (fuori da Notion)
-%- 
-%- spiegare la warp divergence e come ovviarla nel caso della reduction
-%- mostrare l'architettura di un sm
 %- spiegare la bitonic merge network
 %- mostrare il pseudo codice dell'algoritmo di boruvka
 %- come usare la shared per le convoluzioni
@@ -26,7 +23,7 @@
 %- Memorie statiche e dinamiche
 %- Pseudocodice utilizzo di curand per simulare il lancio di N dadi
 %- Sincronizzazione tra più devices che condividono lo stesso bus
-%- spiegare i diversi tipi di stream
+%- 
 %- Ciclo di vita dei thread e organizzazione gerarchica
 %- Sincronizzazione a due livelli di CUDA
 %- Significato e uso della memoria unificata
@@ -53,7 +50,6 @@
     
     \begin{solution}
         Si possono avere più \textbf{livelli di sincronizzazione}:
-        % 
         \begin{itemize}
             \item \textbf{Livello di sistema}: per attendere che un dato task venga completato su host e device; la primitiva
             \begin{minted}{c}
@@ -144,11 +140,11 @@ cudaError_t cudaStreamWaitEvent(
     \question Come si distingue SIMT di CUDA da SIMD? Fare un esempio in cui CUDA si comporta in maniera SIMD.
     
     \begin{solution}
-        \paragraph{Single Instruction Multiple Data SIMD:} Si tratta di un modello in cui, secondo la tassonomia di Flynn, sono presenti più unità di elaborazione e tutte eseguono lo stesso flusso di istruzioni, ciascuna operando su dati diversi.  
+        \textbf{Single Instruction Multiple Data SIMD:} Si tratta di un modello in cui, secondo la tassonomia di Flynn, sono presenti più unità di elaborazione e tutte eseguono lo stesso flusso di istruzioni, ciascuna operando su dati diversi.  
         
-        \paragraph{Single Instruction Multiple Thread SIMT:} Modello introdotto da CUDA che estende SIMD, fornendo a ogni unità di esecuzione (thread) la possibilità di divergere dalle altre, in base ai dati. 
+        \textbf{Single Instruction Multiple Thread SIMT:} Modello introdotto da CUDA che estende SIMD, fornendo a ogni unità di esecuzione (thread) la possibilità di divergere dalle altre, in base ai dati. 
         
-        Il flusso di controllo parte parallelo, ma, in base ai dati, ogni thread può intraprendere un flusso diverso. Per fare ciò è necessario che ogni unità di esecuzione possieda un program counter e register set. 
+        Il flusso di controllo parte parallelo, ma, in base ai dati, ogni thread può intraprendere un flusso diverso. Per fare ciò è necessario che ogni unità di esecuzione possieda un program counter e register set. In realtà, all'interno di CUDA, il PC è uno per ogni warp (gruppo di 32 thread), i quali eseguono le istruzioni in lock-step e nel caso di divergenza i diversi path vanno eseguiti serialmente.
         
         Oltre al costo "architetturale", si ha un costo in termini di performance quando si incontra una divergenza (i path di esecuzione non sono allineati).
         
@@ -167,11 +163,79 @@ __global__ void vectorAdd(const float* A, const float* B,
         In questo modo tutti i thread all'interno di un warp eseguono la stessa istruzione.
     \end{solution}
     
-    \question Meccanismi di sincronizzazione tra GPU e modalità di trasmissione tra queste
+    \question Meccanismi di sincronizzazione tra GPU e modalità di trasmissione tra queste.
     
     \begin{solution}
-        % Sincronizzazione tramite eventi, sincr implicita per trasferimenti, sincr tramite CPU
-        % Trasferimenti con CPU in mezzo e Peer to Peer
+        Tra diverse GPU ci sono più metodi di \textbf{sincronizzazione} possibili: 
+        \begin{itemize}
+            \item Il metodo più semplice è lasciare che sia l'host a sincronizzare tutte le GPU, la primitiva \texttt{cudaDeviceSynchronize()} permette di attendere il completamento di tutte le operazioni su tutte le GPU (il comando va ripetuto per ogni device)
+            
+            \item Per una gestione più flessibile si possono usare gli eventi CUDA; un evento è un marcatore all'interno di una stream su un device, un'altra GPU può "ascoltare" per attendere il completamento di un evento su un altro device, tramite \texttt{cudaStreamWaitEvent()} (bloccante) o \texttt{cudaStreamQueryEvent()} (non bloccante)
+            
+            \item La libreria NCCL (Nvidia Collective Communications Library) fornisce primitive di comunicazione con sincronizzazione implicita
+        \end{itemize}
+        
+        Anche per \textbf{trasmettere dati} tra più GPU ci sono diverse modalità:
+        \begin{itemize}
+            \item La più semplice è via host: i dati vengono copiati sull'host e poi passati ai device a cui servono (tramite \texttt{cudaMemcpy()})
+            
+            \item Se il P2P è abilitato, esistono primitive che permettono lo scambio dati tra GPU diverse, come ad esempio \texttt{cudaMemcpyPeer()}; esistono anche primitive asincrone come \texttt{cudaMemcpyAsync()} e \texttt{cudaMemcpyPeerAsync()}
+            
+            \item Usare unified memory: la memoria unificata permette di avere uno spazio di indirizzamento condiviso tra host e device, allocando con \texttt{cudaMallocManaged()} si può usare lo stesso puntatore su tutti i dispositivi
+            
+            \item Per primitive di comunicazione altamente ottimizzate per la comunicazione collettiva la libreria NCCL offre throughput elevato e bassa latenza
+        \end{itemize}
+    \end{solution}
+    
+    \question Spiegare la warp divergence e come ovviarla nel caso della reduction.
+    
+    \begin{solution}
+        In CUDA, un warp è un insieme di 32 thread che vengono eseguiti sullo stesso Streaming Multiprocessor SM; la warp divergence si ha quando thread all'interno di uno stesso warp prendono path di esecuzione differenti (causa istruzioni di controllo condizionale).
+        
+        Quando c'è una divergenza, all'interno di un warp, l'hardware deve serializzare i path di esecuzione, eseguendoli uno dopo l'altro, ogni volta disabilitando i thread che non devono entrare in quel ramo di esecuzione. Riduce il parallelismo all'interno del warp, degradando, anche significativamente le prestazioni.
+        
+        Per la parallel reduction, l'approccio "naive" consiste nell'imitare la somma strided ricorsiva: al passaggio $i$ si sommano elementi a distanza $2^i$; in parallelo, questo attiverebbe 1 thread ogni $2^{i+1}$, causando divergenza crescente (a ogni step si usano la metà dei thread precedenti, divisi sullo stesso numero di warp).
+        
+        Per risolvere questo problema vogliamo usare thread adiacenti per fare le somme, "disaccoppiando" l'indice del dato dall'indice del thread. Calcoliamo l'indice del dato di cui si deve occupare ogni thread come \texttt{2*stride*tid}, in questo modo thread adiacenti si occupano di tutte le somme, rimuovendo la divergenza (i thread che andrebbero oltre la dimensione dell'array vanno disattivati).
+        
+        Riorganizzare i pattern di accesso ai dati per "convertire" gli indici in modo che l'utilizzo dei thread sia allineato alla granularità del warp.
+    \end{solution}
+    
+    \question Mostrare l'architettura di uno SM.
+    
+    \begin{solution}
+        Le GPU sono costituite da array di Streaming Multiprocessor SM, ognuno dei quali è pensato per supportare l'esecuzione concorrente di centinaia di thread. Si divide in gruppi di 32 thread chiamati "warp".
+        
+        Ogni SM al suo interno è composto da: 
+        \begin{itemize}
+            \item CUDA Core: le ALU per le operazioni intere o floating point
+            
+            \item Warp scheduler: a ogni ciclo di clock decidono quali warp sono pronti e possono essere mandati in esecuzione
+            
+            \item Dispatch unit: invia le istruzioni del warp selezionato alle varie execution unit
+            
+            \item Special Function Unit SFU: usate per calcoli complessi, svolti in modo hardware
+            
+            \item Eventuali unità specializzate, come Tensor Core o FP64
+            
+            \item Load/Store Unit LSU: per la gestione delle operazioni di lettura/scrittura in shared memory/cache L1
+            
+            \item Register file: insieme dei registri per i thread di uno SM, la dimensione limita il numero di thread residenti concorrentemente 
+            
+            \item Cache L1/shared memory: memoria condivisa tra i thread del blocco, a bassa latenza
+            
+            \item Cache L2: condivisa tra tutti gli SM, gestisce il traffico verso la memoria globale
+            
+            \item Instruction Cache: per ridurre la latenza dovuta al fetch di istruzioni
+            
+            \item Texture \& constant cache: cache separate per accessi read-only in maniera non sequenziale
+        \end{itemize}
+    \end{solution}
+    
+    \question Spiegare i diversi tipi di stream.
+    
+    \begin{solution}
+        Stream
     \end{solution}
 \end{questions}
 
