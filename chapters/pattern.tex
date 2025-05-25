@@ -180,6 +180,40 @@ All'interno di ogni round, il passo di selezione e colorazione può essere esegu
 
 Per un grafo sparso e con distribuzioni casuali dei pesi converge con alta probabilità per $O(\log |V|)$.
 
+Pseudocodice:
+\begin{center}
+    \begin{minipage}{.7\textwidth}
+        \begin{tcolorbox}[
+            colback=white,
+            sharp corners,
+            boxrule=.3mm,
+            left=20pt,
+            top=0pt,
+            bottom=0pt,
+            colbacktitle=white,
+            coltitle=black
+            ]
+            \LinesNumbered
+            \begin{algorithm}[H]
+                \SetAlgoNoEnd
+                \SetKwSty{texttt}
+                \SetArgSty{relax}
+                $S \leftarrow \emptyset$; \\
+                $R \leftarrow V$;  \\
+                \While{$R \neq \emptyset$}{
+                    $\forall v \in R$, $\pi (v) \leftarrow$ rand() \tcp*{parallelo}
+                    \If{$\pi (v)> \pi(n)$, $\forall n \in N(v)$ non colorato}{
+                        $C \leftarrow \bigcup_{n \in N(v)} c(n)$; \\
+                        $c(v) \leftarrow$ colore minimo $\notin C$; \\
+                        $S \leftarrow S \cup \{v\}$; \\
+                        $R \leftarrow R - \{v\}$; \\
+                    }                            
+                }
+            \end{algorithm}
+        \end{tcolorbox}
+    \end{minipage}
+\end{center}
+
 \subsection{Insieme Indipendente Massimale MIS}
 
 Dato un grafo $G = (V,E)$, un \textbf{Indipendent Set} IS è un sottoinsieme $U \subseteq V$ dei nodi del grafo tale che non ci siano nodi in $U$ adiacenti $\forall u,v \in U$, $(u,v) \notin E$.
@@ -249,6 +283,7 @@ Oppure esiste una permutazione ciclica degli indici per la quale la proprietà v
 Vale che 
 \begin{itemize}
     \item $s_1$ e $s_2$ sono ancora sequenze bitoniche
+    
     \item $a_i < a_j$, $\forall a_i \in s_1$, $\forall a_j \in s_2$, i.e., tutti gli elementi di $s_1$ sono minori degli elementi di $s_2$
 \end{itemize}
 
@@ -256,10 +291,11 @@ Si può quindi applicare ricorsivamente questa procedura alla sequenza dati per 
 
 Dopo $\log n - 1$ passi, ogni sequenza bitonica avrà solo 2 elementi: ordinabili banalmente.
 
-\paragraph{Bitonic Merging Networks:} Con $n$ input: 
+\paragraph{Bitonic Merging Networks:} Con una sequenza bitonica lunga $n$ in input produce una sequenza: 
 \begin{itemize}
-    \item produce una sequenza crescente con il comparatore $\oplus BM [n]$
-    \item produce una sequenza decrescente con il comparatore $\ominus BM [n]$
+    \item crescente con il comparatore $\oplus BM [n]$
+    
+    \item decrescente con il comparatore $\ominus BM [n]$
 \end{itemize}
 
 Per $n = 2$ banalmente:
@@ -278,6 +314,7 @@ Sulla destra una semplificazione in quanto reti con $n = 2$ sono dei comparatori
 Per una rete con $n$ fili, $\oplus BM [n]$, (quindi sequenza bitonica lunga $n$ in ingresso e ordinata in uscita), servono: 
 \begin{itemize}
     \item $\log_2 n$ colonne
+    
     \item $n/2$ comparatori per colonna
 \end{itemize}
 
@@ -306,7 +343,7 @@ Si può ordinare una sequenza qualsiasi avendo:
     \item aggiungere un comparatore $\oplus BM [n]$ alla fine per ordinare la sequenza
 \end{itemize}
 
-\paragraph{Complessità:} Per una sequenza lunga $n$, ogni step richiede: 
+\paragraph{Complessità:} Per una sequenza lunga $n$, tutte le $\log n$ colonne richiedono: 
 \begin{align*}
     T(n) & = T(n/2) + \log (n) \\
     & = \log (n) + \log (n/2) + \dots + 1 \\

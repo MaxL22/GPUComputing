@@ -1,0 +1,153 @@
+% !TeX spellcheck = it_IT
+\section{Pattern}
+
+\begin{questions}
+    \question Pseudocodice di Jones-Plassman per la colorazione parallela
+    
+    \begin{solution}
+        L'algoritmo di Jones-Plassman è un algoritmo approssimato per ambienti distribuiti per risolvere il problema di graph coloring, con una qualità delle soluzioni simile a quella degli algoritmi sequenziali.
+        
+        Dato un grafo $G = (V, E)$ e un insieme di colori $\mathcal{C}$: 
+        \begin{itemize}
+            \item Ogni vertice $v \in V$ riceve una priorità casuale
+            
+            \item Ogni vertice può decidere il proprio colore quando ha priorità maggiore di tutti i vicini non ancora colorati
+            
+            \item Viene iterato lo step di decisione, fino a completamento
+        \end{itemize}
+        
+        All'interno di ogni round, il passo di decisione e selezione può essere svolto in parallelo. Per un grafo sparso e con distribuzioni casuali dei pesi converge con \textit{alta probabilità} per $O(\log |V|)$.
+        
+        Pseudocodice (inventato al momento):
+        \begin{center}
+            \begin{minipage}{.7\textwidth}
+                \begin{tcolorbox}[
+                    colback=white,
+                    sharp corners,
+                    boxrule=.3mm,
+                    left=20pt,
+                    top=0pt,
+                    bottom=0pt,
+                    colbacktitle=white,
+                    coltitle=black
+                    ]
+                    \LinesNumbered
+                    \begin{algorithm}[H]
+                        \SetAlgoNoEnd
+                        \SetKwSty{texttt}
+                        \SetArgSty{relax}
+                        $S \leftarrow \emptyset$; \\
+                        $R \leftarrow V$;  \\
+                        \While{$R \neq \emptyset$}{
+                            $\forall v \in R$, $\pi (v) \leftarrow$ rand() \tcp*{parallelo}
+                            \If{$\pi (v)> \pi(n)$, $\forall n \in N(v)$ non colorato}{
+                                $C \leftarrow \bigcup_{n \in N(v)} c(n)$; \\
+                                $c(v) \leftarrow$ colore minimo $\notin C$; \\
+                                $S \leftarrow S \cup \{v\}$; \\
+                                $R \leftarrow R - \{v\}$; \\
+                            }                            
+                        }
+                    \end{algorithm}
+                \end{tcolorbox}
+            \end{minipage}
+        \end{center}
+        
+        Dove $\pi: V \rightarrow \N$ restituisce la priorità del nodo e $c: V \rightarrow \mathcal{C}$ restituisce il colore del nodo.
+    \end{solution}
+    
+    \question Implementazione di Horn per prefix sum.
+    
+    \begin{solution}
+        Avendo a disposizione molti processori, si vuole ridurre il tempo delle somme prefisse a $O(\log n)$, anche a costo di qualche operazione in più.
+        
+        Viene usato un approccio iterativo in $d = \lceil \log_2 n \rceil$ passi, a ogni passo, da $1$ a $d$:
+        \begin{itemize}
+            \item Calcolo l'offset $\Delta = 2^i$
+            
+            \item Per ogni elemento $k$ dell'array (in parallelo)
+            \begin{itemize}
+                \item se $k \geq \Delta$: $x[k] \leftarrow x[k] + x[k - \Delta]$
+                
+                \item se $k < \Delta$: $x[k] \leftarrow x[k]$
+            \end{itemize}
+        \end{itemize}
+        
+        Questo algoritmo effettua $\Theta (\log n)$ step, ma $\Theta (n \log n)$ operazioni, quindi non è work efficient.
+    \end{solution}
+    
+    \question Schema per l'implementazione work efficient della prefix sum.
+    
+    \begin{solution}
+        La prefix sum, dato un operatore binario associativo (in questo caso la somma) e due vettori di dimensione $n$ ($a$ input, $b$ output) vuole fare in modo che:
+        $$ b[k] = \sum_{i = 0}^{k} a[i] \quad \forall k \in [0,n-1] $$
+        
+        La strategia work efficient usa (concettualmente) un albero bilanciato sui dati in input, in cui le foglie sono i valori dell'array di input.
+        
+        Due fasi: 
+        \begin{enumerate}
+            \item reduce o up-sweep: per costruire le somme parziali fino alla radice, ogni nodo a livelli intermedi sarà la somma dei nodi figlio
+            
+            \item down-sweep: per distribuire i prefissi corretti alle foglie; si scorrono i livelli dalla radice verso le foglie, si setta la radice a zero e
+            \begin{itemize}
+                \item ogni figlio sinistro sarà pari al padre
+                
+                \item ogni figlio destro sarà la somma del padre e del valore (prima che venga aggiornato) del figlio sinistro
+            \end{itemize}
+        \end{enumerate}
+        
+        In totale sono: 
+        \begin{itemize}
+            \item $2 \log n$ passi, ovvero $\log n$ per fase
+            
+            \item $2n - 1$ operazioni, una per nodo interno dell'albero per fase
+        \end{itemize}
+    \end{solution}
+    
+    \question Spiega il bitonic MergeSort
+    
+    \begin{solution}
+        Una sequenza bitonica è una sequenza $s = \{a_0, \dots, a_{n-1}\}$ su cui vale la proprietà
+        $$ \exists i \in [0, n-1] \tc a_0 \leq \dots \leq a_i \geq \dots a_{n-1} $$
+        oppure esiste una permutazione ciclica degli indici per il quale la proprietà vale.
+        
+        Se la sequenza $s = \{a_0, \dots, a_{n-1}\}$ è bitonica, allora
+        \begin{align*}
+            s_1 & = \{\min(a_0, a_{n/2}), \min(a_1, a_{n/2 + 1}), \dots, \min (a_{n/2 - 1}, a_{n-1})\} \\
+            s_2 & = \{\max(a_0, a_{n/2}), \max(a_1, a_{n/2 + 1}), \dots, \max (a_{n/2 - 1}, a_{n-1})\} \\
+        \end{align*}
+        sono anch'esse sequenze bitoniche e tutti gli elementi di $s_1$ sono minori di tutti gli elementi di $s_2$.
+        
+        Si può ripetere questo passaggio fino a sequenze di 2 elementi, ordinabili banalmente ($\log n - 1$ passi).
+    \end{solution}
+    
+    \question Spiegare la bitonic merge network.
+    
+    \begin{solution}
+        Una bitonic merging network con una sequenza bitonica lunga $n$ in input produce una sequenza 
+        \begin{itemize}
+            \item crescente con il comparatore $\oplus BM[n]$
+            \item decrescente con il comparatore $\ominus BM[n]$
+        \end{itemize}
+        
+        Per una rete con $n=2$ si tratta di comparatori che semplicemente "scambiano" i valori se sono nell'ordine sbagliato. 
+        
+        Per una rete con $n$ fili, una $BM[n]$ ha
+        \begin{itemize}
+            \item $\log_2 n$ colonne
+            
+            \item $n/2$ comparatori a coppie per colonna
+        \end{itemize}
+        
+        Ogni colonna ha comparatori a distanza metà di quella precedente, a partire da distanza $n/2$, fino a $1$ (dopo $\log_2 n$ colonne). In questo modo, a partire da una sequenza bitonica in entrata, si ha una sequenza ordinata in uscita.
+    \end{solution}
+    
+    \question Spiega l'ordinamento bitonico
+    
+    \begin{solution}
+        A partire da una sequenza qualsiasi, si può creare una sequenza bitonica tramite una rete con $\log_2 n - 1$ colonne in cui ogni $i$-esima colonna usa $\oplus BM [2^i]$ e $\ominus BM [2^i]$ alternati su tutto l'input per creare sequenze bitoniche lunghe $2^{i+1}$ (a partire da $i=0$, un valore è banalmente una sequenza bitonica).
+        
+        Alla fine si ha una sequenza bitonica ordinabile con una bitonic merging network $\oplus BM [n]$ (o $\ominus BM [n]$).
+        
+        Per una sequenza lunga $n$, la complessità è $\Theta (\log^2 n)$.
+    \end{solution}
+\end{questions}

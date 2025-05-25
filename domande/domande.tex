@@ -1,6 +1,5 @@
 % !TeX spellcheck = it_IT
 \documentclass[12pt, answers]{exam}
-%\usepackage[italian]{babel}
 
 \usepackage[hidelinks]{hyperref}
 \usepackage{xcolor}
@@ -12,40 +11,36 @@
 \setminted[java]{bgcolor=bg}
 \usepackage[autostyle, english = american]{csquotes}
 \MakeOuterQuote{"}
+\usepackage{array}
+\usepackage{tcolorbox}
+\usepackage{algorithm2e}
+\usepackage{amsmath}
+\usepackage{amsfonts}
 
 \title{GPU Computing}
 \author{Massimo Perego}
 \date{}
 
 \renewcommand{\contentsname}{Sezioni}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\tc}{\, \text{ t.c. } \,}
 
 % TODO: Domande trovate (fuori da Notion)
 
 % Pattern
-%- spiegare la bitonic merge network
-%- Fare uno schema di un bitonic merge network
 %- mostrare il pseudo codice dell'algoritmo di boruvka
 %- Fare uno schema di una BFS parallela
-%- pseudocodice di jones-plassman per la colorazione parallela
-%- schema per l'implementazione work efficient della prefix sum
 
 % Memoria
-%- Memorie statiche e dinamiche
-%- Significato e uso della memoria unificata
-%- significato e utilità di pattern di accesso alla memoria globale
-%- pseudocodice del trasferimento in memoria shared per il prodotto matriciale 
-% Bank, bank conflict
-
-% Sincronizzazione
+% DMSA: pseudocodice del trasferimento in memoria shared per il prodotto matriciale
 
 % Architettura
 %- Ciclo di vita dei thread e organizzazione gerarchica
 %- cosa sono i warp in simt e qual è la loro utilità
 %- Esempio e vantaggi di loop unrolling
 %- cos'è la scalabilità, come vengono misurati i tempi e lo speedup
-%- uso degli stream per il prodotto di matrici diagonali a blocchi
-%- cosa sono le operazioni atomiche e come vengono usate per il calcolo dell'istogramma di immagini RGB
-
+%- DMSA: uso degli stream per il prodotto di matrici diagonali a blocchi
+%- DMSA: cosa sono le operazioni atomiche e come vengono usate per il calcolo dell'istogramma di immagini RGB
 
 
 % Domande in dubbio:
@@ -62,12 +57,14 @@
 
 \newpage
     
-\input{sections/sinc}
+\include{sections/sinc}
 
-\input{sections/memoria}
+\include{sections/memoria}
 
-\input{sections/arch}
+\include{sections/arch}
 
-\input{sections/librerie}
+\include{sections/librerie}
+
+\include{sections/pattern}
 
 \end{document}

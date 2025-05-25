@@ -61,4 +61,80 @@
             \item Constant \& Texture memory: risiedono nella device memory, ma hanno una cache all'interno di ogni SM, sono usate per accessi uniformi read-only, ovvero quando tutti i thread devono accedere a una stessa zona di memoria (hanno la banda della device memory altrimenti). La texture memory è ottimizzata per dati e operazioni su dati espressi sotto forma di matrici
         \end{itemize}
     \end{solution}
+    
+    \question Memorie statiche e dinamiche.
+    
+    \begin{solution}
+        Le allocazioni di memoria possono essere statiche o dinamiche. Le allocazioni statiche hanno dimensione nota compile-time e possono risiedere a livello di: 
+        \begin{itemize}
+            \item Global memory: la si può dichiarare tramite \texttt{\_\_device\_\_} (o \texttt{\_\_constant\_\_} se di sola lettura), ha un accesso lento, scope e lifetime globale
+            
+            \item Shared memory: la si può dichiarare tramite \texttt{\_\_shared\_\_} all'interno del kernel, latenza bassa, ha scope a livello di blocco e lifetime del kernel
+            
+            \item Registri: variabili locali ai thread, si tratta della memoria più veloce, ma limitata nella quantità
+        \end{itemize}
+        
+        Le allocazioni dinamiche invece sono usate quando la dimensione dei dati è nota solo in esecuzione. Possono essere:
+        \begin{itemize}
+            \item Device malloc: tramite la primitiva \texttt{cudaMalloc()}, richiede passaggi di memoria espliciti da host a device (e viceversa, \texttt{cudaMemcpy()}), disponibile fino all'istruzione \texttt{cudaFree()}, risiede nella memoria globale del device
+            
+            \item Pinned memory: non all'interno del device, ma la primitiva \texttt{cudaHostAlloc()} permette di allocare memoria non paginabile dal sistema operativo per trasferimenti più veloci
+            
+            \item Unified Memory: la primitiva \texttt{cudaMallocManaged()} permette di avere una zona di memoria con indirizzamento unico per host e device, lasciando la gestione della migrazione dei dati a CUDA; semplice da utilizzare, ma può portare a maggiori latenze se non usata correttamente
+            
+            \item Shared memory: la memoria condivisa può essere allocata dinamicamente tramite una dichiarazione all'interno del kernel di una variabile adimensionale:
+            \begin{minted}{c}
+extern __shared__ float s[];
+            \end{minted}
+            Va poi passato come terzo argomento tra variabili angolari durante il lancio del kernel la dimensione della memoria condivisa:
+            \begin{minted}{c}
+kernel<<<grid, block, shared_bytes>>>();
+            \end{minted}
+        \end{itemize}
+    \end{solution}
+    
+    \question Significato e uso della memoria unificata.
+    
+    \begin{solution}
+        La memoria unificata è un modello di gestione della memoria che permette l'utilizzo di un singolo spazio di indirizzamento (puntatore unico) per accedere a dati sia host che device. 
+        
+        Ha lo scopo di semplificare la gestione della memoria, rendendo trasparenti al programmatore i trasferimenti, gestiti da CUDA. 
+        
+        La si può allocare tramite la funzione \texttt{cudaMallocManaged()}, possiede un parametro \texttt{flag} per specificare se la memoria è condivisa solo con l'host o anche con tutte le altre GPU.
+        
+        Semplifica lo sviluppo CUDA, ma può portare a un maggiore overhead dovuto alla migrazione (gestita a livello di pagina) rispetto alla gestione della memoria con trasferimenti espliciti.
+    \end{solution}
+    
+    \question Significato e utilità di pattern di accesso alla memoria globale.
+    
+    \begin{solution}
+        I pattern di accesso alla memoria globale sono le strutture riguardanti "come" viene effettuato l'accesso alla memoria da parte dei thread.
+        
+        Gli accessi alla memoria del device possono avvenire in transazioni da 32, 64 o 128 byte. Spesso le applicazioni sono limitate dal throughput effettivo della memoria, quindi per rendere efficienti i trasferimenti si vuole minimizzare il numero di transazioni. 
+        
+        Per migliorare le prestazioni è bene ricordare che le istruzioni vengono eseguite a livello di warp, per un dato indirizzo si esegue una operazione di loading/storing e i 32 thread presentano una singola richiesta di accesso, da servire in una o più transazioni.
+        
+        Gli accessi possono essere:
+        \begin{itemize}
+            \item Allineati: quando il primo indirizzo della transazione è un multiplo della granularità della cache usata per servire la transazione (32 byte per L1, 128 per L2)
+            
+            \item Coalescenti: quando i 32 thread accedono a un blocco contiguo di memoria
+        \end{itemize}
+        
+        Per sfruttare al meglio le transazioni di memoria bisogna rispettare allineamento e coalescenza. Al contrario, effettuare accessi non coalescenti/strided significa rendere necessarie più transazioni per la stessa quantità di dati (fino a 32 diverse).
+        
+        Può essere importante strutturare i dati in modo da avere accessi coalescenti (array of structures vs structures of array).
+        
+        Le operazioni di scrittura non usano la cache L1, le \texttt{store} vengono cachate solo in L2, prima di essere inviati alla device memory in 1,2 o 4 segmenti da 32 byte.
+    \end{solution}
+    
+    \question Bank e bank conflict.
+    
+    \begin{solution}
+        La shared memory è una memoria condivisa a livello di blocco, locata all'interno dello SM. Questa è organizzata in "banks" paralleli che permettono l'accesso simultaneo ai dati.
+        
+        La shared memory è quindi suddivisa in blocchi identici, solitamente da 4 byte/una word, e ciascun blocco può servire un solo accesso per ciclo di clock. 
+        
+        Se più thread accedono in parallelo a indirizzi mappati a bank diversi, questi accessi possono avvenire in parallelo, altrimenti, se due o più thread vogliono accedere allo stesso bank si ha un bank conflict e gli accessi vengono serializzati. Si vogliono quindi evitare i conflitti per utilizzare la massima banda disponibile.
+    \end{solution}
 \end{questions}
