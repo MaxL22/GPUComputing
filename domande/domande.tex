@@ -2,6 +2,7 @@
 \documentclass[12pt, answers]{exam}
 %\usepackage[italian]{babel}
 
+\usepackage[hidelinks]{hyperref}
 \usepackage{xcolor}
 \definecolor{bg}{rgb}{0.95,0.95,0.95}
 \definecolor{g}{rgb}{0,0.5,0.1}
@@ -29,17 +30,13 @@
 %- schema per l'implementazione work efficient della prefix sum
 
 % Memoria
-%- come usare la shared per le convoluzioni
-%- Modalità di accesso alla device memory e performance
 %- Memorie statiche e dinamiche
 %- Significato e uso della memoria unificata
 %- significato e utilità di pattern di accesso alla memoria globale
 %- pseudocodice del trasferimento in memoria shared per il prodotto matriciale 
+% Bank, bank conflict
 
 % Sincronizzazione
-%- Sincronizzazione tra più devices che condividono lo stesso bus
-%- Sincronizzazione a due livelli di CUDA
-%- cos'è la divergenza e qual è la sua relazione con la sincronizzazione a livello di blocco
 
 % Architettura
 %- Ciclo di vita dei thread e organizzazione gerarchica
@@ -49,8 +46,13 @@
 %- uso degli stream per il prodotto di matrici diagonali a blocchi
 %- cosa sono le operazioni atomiche e come vengono usate per il calcolo dell'istogramma di immagini RGB
 
-% Domande in dubbio (non so se ha spiegato quest'anno, le chiede?)
-%- schema di utilizzo di più gpu, ad esempio per la somma di due vettori
+
+
+% Domande in dubbio:
+% - schema di utilizzo di più gpu, ad esempio per la somma di due vettori
+%		Lo ha spiegato?
+% - Sincronizzazione a due livelli di CUDA.
+% 		Cosa vuol dire?
 
 \begin{document}
     

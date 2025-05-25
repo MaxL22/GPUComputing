@@ -97,4 +97,42 @@ cudaError_t cudaStreamWaitEvent(
             \item Per primitive di comunicazione altamente ottimizzate per la comunicazione collettiva la libreria NCCL offre throughput elevato e bassa latenza
         \end{itemize}
     \end{solution}
+    
+    \question Sincronizzazione tra più device che condividono lo stesso bus.
+    
+    \begin{solution}
+        La sincronizzazione tramite stream ed eventi si può usare anche tra diversi device: un device può controllare il completamento di un evento appartenente a uno stream in esecuzione su un diverso device. La primitiva
+        \begin{minted}{c}
+cudaError_t cudaEventSynchronize(cudaEvent_t event);
+        \end{minted}
+        permette di attendere l'esecuzione di un evento in maniera bloccante, altrimenti
+        \begin{minted}{c}
+cudaError_t cudaEventQuery(cudaEvent_t event)
+        \end{minted}
+        permette di controllare se l'evento è completato o meno in maniera non bloccante.
+        
+        Rimane sempre un opzione la sincronizzazione host-side tramite \texttt{cudaDeviceSynchronize()}, da effettuare per ogni dispositivo.
+        
+        Esistono inoltre primitive di sincronizzazione esplicite per kernel cooperativi multi-device (\texttt{this\_grid().sync()}).
+        
+        La libreria NCCL (Nvidia Collective Communications Library) per la comunicazione collettiva fornisce primitive con sincronizzazione implicita al loro interno.
+    \end{solution}
+    
+    \question Cos'è la divergenza e qual è la sua relazione con la sincronizzazione a livello di blocco.
+    
+    \begin{solution}
+        La divergenza è un fenomeno per cui i thread all'interno di uno stesso warp (gruppo di 32 thread) seguono percorsi di esecuzione diverse a causa di istruzioni di branching (\texttt{if}, \texttt{switch}, \dots). Questo porta a un degrado delle performance in quanto i flussi di esecuzione diversi sono eseguiti in modo seriale dall'hardware (si ha un singolo PC per warp), disattivando i thread "non interessati".
+        
+        CUDA fornisce primitive per la sincronizzazione esplicita a livello di blocco: 
+        \begin{minted}{c}
+__syncthreads();
+        \end{minted}
+        Ovvero una barriera che devo raggiungere tutti i thread prima che la computazione possa proseguire.
+        
+        Se una primitiva \texttt{\_\_syncthreads()} è "nascosta" dietro a istruzioni condizionali e non viene raggiunta da tutti i thread del blocco si incorre in un deadlock: i thread che hanno raggiunto l'istruzione rimarranno fermi.
+        
+        Non si può risolvere la divergenza a livello di blocco, anche se la sincronizzazione è posta in maniera corretta (non causa deadlock), la serializzazione dei percorsi di esecuzione avviene ugualmente. Per risolvere la divergenze si possono usare primitive di sincronizzazione a livello di warp (\texttt{\_\_syncwarp()}) o tecniche per evitare del tutto istruzioni condizionali.
+        
+        
+    \end{solution}
 \end{questions}

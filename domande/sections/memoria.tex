@@ -30,4 +30,35 @@
         
         La memoria \textbf{unified} è un modello di memoria automatico in cui host e device condividono lo spazio di indirizzamento, tutte le CPU e GPU del sistema possono accedere a questa memoria. Il sistema sottostante si occupa di gestire le migrazioni di memoria secondo necessità, in maniera trasparente all'applicazione. Può essere allocata con \texttt{cudaMallocManaged()} e permette di semplificare notevolmente la programmazione, evitando tutte le copie di dati esplicite, ma richiede overhead di migrazione quando viene fatto l'accesso ai dati.
     \end{solution}
+    
+    \question Come usare la shared memory per le convoluzioni.
+    
+    \begin{solution}
+        Un possibile schema per la convoluzione usando la shared memory è quello del tiling: a ogni blocco della grid viene affidato un "tile" (sotto-blocco) dell'immagine in input, ogni thread nel blocco si occupa di un prodotto della convoluzione. 
+        
+        In shared memory vanno caricati tutti i possibili dati a cui il blocco deve fare accesso, ovvero la porzione dell'immagine di cui si occupa, assieme all'area data dal raggio della maschera di convoluzione (un "halo" attorno al sotto-blocco stesso).
+        
+        Rimane il problema di come caricare i blocchi in shared memory: i dati sono più del blocco stesso, sarebbe ottimale dividere il più equamente possibile il carico di lavoro. 
+        
+        Un'idea può essere dare un ordine ai thread e "ripetere" il thread block sopra la sotto-matrice formata da tutti i dati da caricare.
+        
+        L'uso della shared memory permette di limitare gli accessi alla memoria globale, incrementando la velocità degli accessi successivi, ma sono da tenere in conto possibili bank conflict (la shared memory è divisa in bank, se due o più thread vogliono accedere alla stessa bank vanno serviti serialmente) e la quantità di memoria shared utilizzata influisce sul numero di blocchi attivi concorrentemente su un singolo SM.
+    \end{solution}
+    
+    \question Modalità di accesso alla device memory e performance.
+    
+    \begin{solution}
+        In CUDA si ha una gerarchia di memorie: 
+        \begin{itemize}
+            \item Registri: allocati per thread, estremamente veloci (latenza praticamente nulla), ma hanno capienza limitata e un uso eccessivo porta a spilling in memoria locale
+            
+            \item Shared Memory: memoria condivisa tra i thread di uno SM, latenza bassa, organizzata in bank: accessi senza conflitti di bank garantiscono throughput massimo. Dimensione comunque limitata e l'uso che ne fa ogni blocco determina il numero di blocchi che possono essere in esecuzione su uno SM concorrentemente
+            
+            \item Global Memory: memoria più grande e a più alta latenza ($400 \sim 800$ cicli), accessibile da tutti i thread e dall'host. Permette una buona latenza, ma solo se gli accessi sono coalescenti (raggruppati in transazioni larghe)
+            
+            \item Local Memory: risiede fisicamente nella global memory, quindi ha la stessa latenza, viene usata per variabili molto grandi o per lo spilling dei registri
+            
+            \item Constant \& Texture memory: risiedono nella device memory, ma hanno una cache all'interno di ogni SM, sono usate per accessi uniformi read-only, ovvero quando tutti i thread devono accedere a una stessa zona di memoria (hanno la banda della device memory altrimenti). La texture memory è ottimizzata per dati e operazioni su dati espressi sotto forma di matrici
+        \end{itemize}
+    \end{solution}
 \end{questions}
