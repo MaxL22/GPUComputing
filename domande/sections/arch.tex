@@ -186,6 +186,22 @@ A[base] += B[base + 3];
     	 	
     	 	\item Gli strumenti di profiling forniti da Nvidia permettono un'analisi dettagliata delle prestazioni, inclusi i tempi di esecuzione del kernel
     	 \end{itemize}
-    	 
+    \end{solution}
+    
+    \question Cosa sono le operazioni atomiche e come vengono usate per il calcolo dell'istogramma di immagini RGB.
+    
+    \begin{solution}
+    	Le operazioni atomiche sono operazioni (solamente matematiche) la quale esecuzione non può essere interrotta da altri thread. Sono funzioni, come ad esempio \texttt{atomicAdd()} che vengono tradotte in operazioni singole. Servono a evitare race conditions per l'aggiornamento di dati da parte di thread multipli.
+    	
+    	Il calcolo dell'istogramma di immagini RGB è una analisi delle frequenze per ogni tono presente in un'immagine. Un'idea per calcolarlo in maniera parallela è:
+    	\begin{itemize}
+    		\item Allocare una struttura dati per memorizzare i valori delle frequenze (basta un array lungo \texttt{3 * 256})
+    		
+    		\item Assegnare a ogni thread un pixel
+    		
+    		\item Ogni thread aumenta di 1 il valore della cella corrispondente al tono di colore del pixel assegnatogli
+    	\end{itemize}
+    	
+    	Quest'ultimo incremento deve essere atomico, altrimenti si potrebbe incorrere in race conditions e di conseguenza valori non consistenti al termine dell'esecuzione.
     \end{solution}
 \end{questions}

@@ -137,4 +137,54 @@ kernel<<<grid, block, shared_bytes>>>();
         
         Se più thread accedono in parallelo a indirizzi mappati a bank diversi, questi accessi possono avvenire in parallelo, altrimenti, se due o più thread vogliono accedere allo stesso bank si ha un bank conflict e gli accessi vengono serializzati. Si vogliono quindi evitare i conflitti per utilizzare la massima banda disponibile.
     \end{solution}
+    
+    \question Pseudocodice del trasferimento in memoria shared per il prodotto matriciale.
+    
+    \begin{solution}
+    	L'idea dietro l'uso della smem è: vogliamo suddividere in tile le zone di memoria della matrici di cui fare il prodotto (divise in \texttt{nblocks} tile della dimensione del block), in modo da poterle caricare con una suddivisione del lavoro più equa possibile. Per il numero di tile \texttt{nblocks} quindi si ripete il processo di 
+    	\begin{itemize}
+    		\item caricare i valori delle due matrici in smem
+    		
+    		\item calcolare la somma parziale data dai valori parziali caricati, per ogni cella della matrice prodotto
+    	\end{itemize}
+    	
+    	Una volta terminato, scrivere i valori in memoria globale.
+    	
+    	Pseudocodice:
+    	\begin{center}
+    		\begin{minipage}{.9\textwidth}
+    			\begin{tcolorbox}[
+    				colback=white,
+    				sharp corners,
+    				boxrule=.3mm,
+    				left=20pt,
+    				top=0pt,
+    				bottom=0pt,
+    				colbacktitle=white,
+    				coltitle=black
+    				]
+    				\LinesNumbered
+    				\begin{algorithm}[H]
+    					\SetAlgoNoEnd
+    					\SetKwSty{texttt}
+    					\SetArgSty{relax}
+    					\texttt{\_\_shared\_\_ As[WIDTH][WIDTH]}; \\
+    					\texttt{\_\_shared\_\_ Bs[WIDTH][WIDTH]}; \\
+    					\texttt{nblocks =} numero di block nelle sotto-matrici da caricare; \\
+    					\For{$i \in$ \texttt{nblocks}}{
+    						\texttt{As[tidy][tidx] = A[tidx\_abs + $i$ * WIDTH][tidy\_abs]}; \\
+    						\texttt{Bs[tidy][tidx] = B[tidx\_abs][tidy\_abs + $i$ * WIDTH]}; \\
+    						\texttt{\_\_syncthreads()}; \\
+    						
+    						\For{$j \in$ \texttt{WIDTH}}{
+    							\texttt{partial\_sum += As[tidy][j] * Bs[j][tidx]}; \\
+    						}
+    						\texttt{\_\_syncthreads()};\\
+    					}
+    					\tcp*{Srivere il risultato in memoria globale}
+    				\end{algorithm}
+    			\end{tcolorbox}
+    		\end{minipage}
+    	\end{center}
+    \end{solution}
 \end{questions}

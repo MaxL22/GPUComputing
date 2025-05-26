@@ -349,6 +349,41 @@ Le operazioni basilari sono:
 	\item Swap: scambiano valore in memoria con uno nuovo
 \end{itemize}
 
+\subsubsection{Calcolo dell'istogramma per immagini RGB}
+
+L'istogramma del colore è una rappresentazione della distribuzione (frequenza relativa/assoluta) tonale dei colori in un'immagine. Può essere costruito per ogni spazio colore, come RGB o HSV.
+
+Per calcolare l'istogramma bisogna: 
+\begin{itemize}
+	\item Considerare separatamente i canali RGB dell'immagine
+	
+	\item Usare le operazioni atomiche per il calcolo delle frequenze 
+	
+	\item Restituire 3 istogrammi distinti (uno per canale) di 256 valori di intensità colore
+\end{itemize}
+
+L'idea è molto semplice: si alloca una struttura dati (array lungo \texttt{3 * 256}) per mantenere i valori dell'istogramma e, per ogni pixel dell'immagine si effettua una \texttt{atomicAdd()} per incrementare il valore della frequenza dei colori presenti nel pixel. 
+
+Esempio per una immagine PPM: 
+\begin{minted}{c}
+__global__ void ppm_histGPU(PPM ppm, int *histogram) {
+	uint x = blockIdx.x * blockDim.x + threadIdx.x;
+	
+	if (x >= ppm.width * ppm.height)
+		return;
+	
+	color R = ppm.image[3 * x];
+	color G = ppm.image[3 * x + 1];
+	color B = ppm.image[3 * x + 2];
+	
+	atomicAdd(&histogram[R], 1);
+	atomicAdd(&histogram[G + 256], 1);
+	atomicAdd(&histogram[B + 512], 1);
+}
+\end{minted}
+
+Se l'incremento non fosse atomico, un thread potrebbe venire interrotto da altri mentre tenta di incrementare una cella, possibilmente portando a race conditions e risultati inconsistenti.
+
 \subsection{Memoria CUDA}
 
 Per il programmatore esistono due tipi di memorie: 
@@ -480,6 +515,60 @@ Ci sono sempre problemi di bordo: cosa faccio quando la maschera considerata arr
 \paragraph{Tiling:} Divido i dati in blocchi (ad esempio, 16 elementi in 4 blocchi da 4 thread), ogni thread nel blocco fa un prodotto della convoluzione. Per ridurre l'accesso alla global memory, in cache/memoria condivisa si tengono i dati a cui l'accesso è fatto più frequentemente, ovvero i valori del "blocco di dati" assegnato al block (tutti i thread devono calcolare sullo stesso insieme di dati, o quasi), tenendo conto della dimensione della maschera (serve avere i dati "adiacenti" al blocco (sarebbe molto utile un'immagine, si capirebbe subito)).
 
 I dati da caricare in smem sono più dei thread nel blocco ("alone" che va al di fuori del blocco di dati stesso); in smem carico tutti i possibili dati a cui il blocco deve fare l'accesso. Chi carica che dati in memoria? I dati esterni al blocco potrebbero essere anche più del blocco stesso (maschera "grossa"). La soluzione è dare un ordine ai thread e dividere il più equamente possibile i caricamenti in memoria tra i thread del blocco.
+
+\subsubsection{Prodotto matriciale con SMEM}
+
+L'approccio più ovvio è quello di lasciare a ogni thread il calcolo di una cella della matrice prodotto. Ogni blocco si occuperebbe di una sezione della matrice prodotto risultante. 
+
+In memoria condivisa andrebbero caricate tutte le righe e colonne delle matrici da cui fare il prodotto. Per distribuire equamente il lavoro tra i thread, si può fare tiling anche delle aree da caricare (multiple della dimensione del blocco, se definite correttamente/le dimensioni in ingresso lo permettono). Una volta finito il caricamento e la sincronizzazione a livello di blocco, ogni thread può calcolare la sua entry della matrice.
+
+Pseudocodice del kernel:
+\begin{center}
+	\begin{minipage}{.9\textwidth}
+		\begin{tcolorbox}[
+			colback=white,
+			sharp corners,
+			boxrule=.3mm,
+			left=20pt,
+			top=0pt,
+			bottom=0pt,
+			colbacktitle=white,
+			coltitle=black
+			]
+			\LinesNumbered
+			\begin{algorithm}[H]
+				\SetAlgoNoEnd
+				\SetKwSty{texttt}
+				\SetArgSty{relax}
+				\texttt{\_\_shared\_\_ As[WIDTH][WIDTH]}; \\
+				\texttt{\_\_shared\_\_ Bs[WIDTH][WIDTH]}; \\
+				\texttt{nblocks =} numero di block nelle sotto-matrici da caricare; \\
+				\For{$i \in$ \texttt{nblocks}}{
+					\texttt{As[tidy][tidx] = A[tidx\_abs + $i$ * WIDTH][tidy\_abs]}; \\
+					\texttt{Bs[tidy][tidx] = B[tidx\_abs][tidy\_abs + $i$ * WIDTH]}; \\
+					\texttt{\_\_syncthreads()}; \\
+					
+					\For{$j \in$ \texttt{WIDTH}}{
+						\texttt{partial\_sum += As[tidy][j] * Bs[j][tidx]}; \\
+					}
+					\texttt{\_\_syncthreads()};\\
+				}
+				\tcp*{Srivere il risultato in memoria globale}
+			\end{algorithm}
+		\end{tcolorbox}
+	\end{minipage}
+\end{center}
+
+L'idea è: 
+\begin{itemize}
+	\item Caricare il primo tile
+	
+	\item Effettuare la somma parziale per ogni cella
+	
+	 \item Ripetere per il numero di tile contenuti nelle zone delle matrici da caricare
+	 
+	 \item Scrivere i risultati finali in memoria globale
+\end{itemize}
 
 \subsection{Global Memory}
 
