@@ -488,8 +488,11 @@ kernel <<<grid, block, N*sizeof(int)>>>(...)
 \end{minted}
 
 Se la dimensione non è nota compile time, è possibile dichiarare una variabile adimensionale con la keyword \texttt{extern}. Dinamicamente si possono allocare solo array 1D.
+\begin{minted}{c}
+extern __shared__ float s[];
+\end{minted}
 
-\paragraph{Allocazione dinamica multipla:} Non si possono allocare multiple allocazioni di shared memory, quindi bisogna fare un'allocazione unica e utilizzare puntatori con offset all'interno dell'area allocata.
+\paragraph{Allocazione dinamica multipla:} Non si possono avere multiple allocazioni dinamiche di shared memory, quindi si utilizza un'allocazione unica e puntatori con offset all'interno della singola area allocata.
 
 Uso tipico della shared memory:
 \begin{enumerate}
@@ -514,7 +517,9 @@ Ci sono sempre problemi di bordo: cosa faccio quando la maschera considerata arr
 
 \paragraph{Tiling:} Divido i dati in blocchi (ad esempio, 16 elementi in 4 blocchi da 4 thread), ogni thread nel blocco fa un prodotto della convoluzione. Per ridurre l'accesso alla global memory, in cache/memoria condivisa si tengono i dati a cui l'accesso è fatto più frequentemente, ovvero i valori del "blocco di dati" assegnato al block (tutti i thread devono calcolare sullo stesso insieme di dati, o quasi), tenendo conto della dimensione della maschera (serve avere i dati "adiacenti" al blocco (sarebbe molto utile un'immagine, si capirebbe subito)).
 
-I dati da caricare in smem sono più dei thread nel blocco ("alone" che va al di fuori del blocco di dati stesso); in smem carico tutti i possibili dati a cui il blocco deve fare l'accesso. Chi carica che dati in memoria? I dati esterni al blocco potrebbero essere anche più del blocco stesso (maschera "grossa"). La soluzione è dare un ordine ai thread e dividere il più equamente possibile i caricamenti in memoria tra i thread del blocco.
+I dati da caricare in smem sono più dei thread nel blocco ("alone" che va al di fuori del blocco di dati stesso); in smem carico tutti i possibili dati a cui il blocco deve fare l'accesso. 
+
+Chi carica che dati in memoria? I dati esterni al blocco potrebbero essere anche più del blocco stesso (maschera "grossa"). La soluzione è dare un ordine ai thread e dividere il più equamente possibile i caricamenti in memoria tra i thread del blocco.
 
 \subsubsection{Prodotto matriciale con SMEM}
 
@@ -806,8 +811,8 @@ Esempio:
 \begin{minted}{c}
 __shared__ float tile[BDIMY][BDIMX];
 // Coordinate originali
-unsigned int row = blockDim.y * blockIdx.y + threadIdx.y;
-unsigned int col = blockDim.x * blockIdx.x + threadIdx.x;
+int y = blockIdx.y * blockDim.y + threadIdx.y;
+int x = blockIdx.x * blockDim.x + threadIdx.x;
 
 // ...
 // Trasferimento in smem e sincronizzazione
