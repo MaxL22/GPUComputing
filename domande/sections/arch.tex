@@ -104,4 +104,88 @@ float* C, int N) {
         \end{minted}
         In questo modo tutti i thread all'interno di un warp eseguono la stessa istruzione.
     \end{solution}
+    
+    \question Ciclo di vita dei thread e organizzazione gerarchica.
+    
+    \begin{solution}
+    	I thread sono l'unità di esecuzione fondamentale in CUDA, il codice viene scritto in CUDA C per l'esecuzione sequenziale la quale viene estesa a migliaia di thread. Ogni thread, durante la sua vita, può passare per più stati di esecuzione, legati anche al modello di esecuzione SIMT e allo scheduling:
+    	\begin{itemize}
+    		\item In esecuzione/selezionato: il thread è pronto per essere eseguito e il warp scheduler manda in esecuzione il relativo warp; sta eseguendo istruzioni
+    		
+    		\item In attesa/blocked: il thread non è parte degli warp "selezionati" dal warp scheduler e non può esserlo in quanto "bloccato" da qualcosa (come l'attesa di un trasferimento di memoria)
+    		
+    		\item Candidato: il thread è pronto, può essere il prossimo ad essere mandato in esecuzione, ma il warp scheduler non lo ha ancora selezionato
+    	\end{itemize}
+    	In realtà lo stato riguarda il warp di cui fa parte il thread, non il thread singolo.
+    	
+    	I thread sono suddivisi (logicamente) su due livelli: 
+    	\begin{itemize}
+    		\item Block: collezione ordinata di thread, che possono cooperare tra loro, indipendenti l'uno con l'altro, ognuno ha dimensione massima di 1024 thread
+    		
+    		\item Grid: insieme di tutti i blocchi che eseguono lo stesso kernel
+    	\end{itemize}
+    	
+    	A livello fisico: 
+    	\begin{itemize}
+    		\item i thread vengono mappati sui CUDA Core
+    		
+    		\item i blocchi vengono mappati sugli SM, ogni SM può eseguire contemporaneamente uno o più blocchi (in base alle caratteristiche degli stessi)
+    		
+    		\item la grid viene mappata al device, il quale può eseguire una o più grid concorrentemente, appartenenti a kernel diversi
+    		
+    		\item i thread fisicamente sono raggruppati in gruppi di 32, detti warp; questi dovrebbero, tra loro, avere modello di esecuzione SIMD, pena un degrado delle prestazioni 
+    	\end{itemize}
+    \end{solution}
+    
+    \question Cosa sono i warp in SIMT e qual è la loro utilità.
+    
+    \begin{solution}
+    	Nella architettura SIMT di CUDA, un warp è il raggruppamento minimo di thread all'interno di uno SM che la GPU esegue in lock-step. Un warp è composto da 32 thread e ognuno di questi esegue la stessa istruzione nello stesso ciclo di clock. 
+    	
+    	All'interno del modello SIMT l'esecuzione parte parallela, ma ogni thread può intraprendere un percorso di esecuzione diverso, raggruppando i thread in gruppi da 32 si può ridurre l'overhead dovuto a controllo e fetching delle istruzioni. Questo può però portare a problemi di divergenza: thread all'interno di un singolo warp devono eseguire la stessa istruzione, se sono presenti path di esecuzione diversi questi vanno eseguiti serialmente, degradando le prestazioni.
+    	
+    	Inoltre, uno SM decide quali warp mandare in esecuzione tra quelli candidati/pronti, rendendo inattivi gli warp che richiedono attesa, mascherando così la latenza dovuta a operazioni come trasferimenti di memoria. Si vuole massimizzare l'occupancy, ovvero il rapporto tra thread attivi e thread massimi sostenibili, misurato in warp. 
+    \end{solution}
+    
+    \question Esempio e vantaggi di loop unrolling.
+    
+    \begin{solution}
+    	Il loop unrolling è una tecnica usata per ottimizzare i cicli: questi vengono "srotolati" in modo da ridurre l'overhead dovuto alle operazioni di controllo, ridurre il branching e i salti condizionali, aumentando così il livello di parallelismo. Si copia il corpo del loop un numero $n$ di volte, chiamato unroll factor. Lo si può fare manualmente, in alternativa, CUDA fornisce direttive di compilazione.
+    	
+    	Esempio di loop unrolling: 
+    	\begin{minted}{c}
+for (int i = 0; i < 4; i++){
+	A[base] += B[base + i];
+}
+    	\end{minted}
+    	Può diventare:
+    	\begin{minted}{c}
+A[base] += B[base + 0];
+A[base] += B[base + 1];
+A[base] += B[base + 2];
+A[base] += B[base + 3];
+    	\end{minted}
+    	
+    	Lo si dovrebbe usare quando il corpo del ciclo è semplice e il numero di iterazioni è multiplo dell'unroll factor. Un unrolling troppo spinto potrebbe causare bloating del codice e riduzione delle performance dovuta a mancanza di spazio in cache/instruction buffer.
+    \end{solution}
+    
+    \question Cos'è la scalabilità? Come vengono misurati i tempi e lo speedup.
+    
+    \begin{solution}
+    	La scalabilità è una proprietà desiderabile per qualsiasi applicazione parallela, fa riferimento alla capacità di eseguire parti di un calcolo in modo concorrente per risolvere velocemente problemi anche di grandi dimensioni; di conseguenza, è la capacità di un'applicazione di trarre vantaggio dall'aumento delle risorse, in maniera efficiente.
+    	
+    	 Lo speed-up è definito come il rapporto tra il tempo di esecuzione sequenziale $T(1)$ e il tempo di esecuzione su $p$ dispositivi $T(p)$:
+    	 $$ S(p) = \frac{T(1)}{T(p)} $$
+    	 L'efficienza è lo speeup normalizzato per il numero di risorse.
+    	 
+    	 I tempi, in ambito CUDA, richiedono di tenere conto dell'esecuzione parallela o asincrona: 
+    	 \begin{itemize}
+    	 	\item Per tenere traccia solamente dell'esecuzione dei kernel si possono usare gli eventi di timing forniti da CUDA. Tra due eventi, i quali si possono registrare tramite \texttt{cudaEventRecord()}, si può fare \texttt{cudaEventElapsedTime()} per trovare il tempo tra loro (in ms). Questo non tiene conto dell'overhead dovuto ad allocazione e trasferimento della memoria
+    	 	
+    	 	\item I tempi possono essere misurati dal "punto di vista" dell'host tramite normali primitive di sistema/C, in questo modo si può considerare anche l'overhead dovuto ad allocazione e trasferimento della memoria; da ricordare che il lancio dei kernel è asincrono, quindi prima di prendere la misurazione del tempo finale è necessario sincronizzare il device tramite \texttt{cudaDeviceSynchronize()}
+    	 	
+    	 	\item Gli strumenti di profiling forniti da Nvidia permettono un'analisi dettagliata delle prestazioni, inclusi i tempi di esecuzione del kernel
+    	 \end{itemize}
+    	 
+    \end{solution}
 \end{questions}
