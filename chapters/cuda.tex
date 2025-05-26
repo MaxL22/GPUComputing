@@ -790,3 +790,33 @@ float x = Px[idx];   // stride = 1
 In generale (per CC superiori a 2) le transazioni coprono 128 byte. All'interno di un singolo segmento da 128 byte, la memoria è organizzata in "banks" (4 da 32 byte solitamente), anche se un thread legge solo 4 byte, dovrà trasferire l'intero bank.
 
 La cache L1 serve load/store anche con granularità a 32 byte.
+
+\subsubsection{Matrice trasposta con SMEM}
+
+Il problema del parallelizzare l'operazione di trasposizione di una matrice  è che in lettura gli accessi sono per riga, quindi coalescenti, mentre le scritture sulla matrice trasposta sono per colonna, quindi non coalescenti.
+
+Un'idea per risolvere il problema può essere: 
+\begin{itemize}
+	\item Caricare dalla global memory alla smem le celle che il blocco corrente deve trasporre, riga per riga
+	
+	\item Leggere una colonna in smem e scrivere una riga in global memory
+\end{itemize}
+
+Esempio:
+\begin{minted}{c}
+__shared__ float tile[BDIMY][BDIMX];
+// Coordinate originali
+unsigned int row = blockDim.y * blockIdx.y + threadIdx.y;
+unsigned int col = blockDim.x * blockIdx.x + threadIdx.x;
+
+// ...
+// Trasferimento in smem e sincronizzazione
+
+// Nuovi indici
+int y = blockIdx.x * blockDim.x + threadIdx.y;
+int x = blockIdx.y * blockDim.y + threadIdx.x;
+
+// ...
+// Scrivere sulla matrice output, 
+//		controlli invertiti tra riga e colonna
+\end{minted}

@@ -93,6 +93,14 @@ Sarebbe da limitare un attimo l'annidamento: se ogni thread facesse una chiamata
 
 \paragraph{Sincronizzazione:} Si ha una \textbf{sincronizzazione implicita}, il padre non può terminare prima dei figlio, un kernel non è considerato completato finché ha figli attivi. Rimane la possibilità di avere sincronizzazione esplicita, altrimenti il kernel padre non ha garanzie di poter vedere i dati elaborati dal figlio.
 
+\subsubsection{MQDB con Parallelismo dinamico}
+
+Una MQDB è una matrice composta da $k$ blocchi disposti sulla diagonale principale. Il prodotto di matrici MQDB è una matrice dello stesso tipo.  
+
+Al posto di fare il prodotto sull'intera matrice, si possono invocare più kernel per fare il prodotto solo tra i blocchi sulle diagonali.
+
+Sono piuttosto sicuro che non sia una spiegazione sensata, nè completa, ma non ho capito molto tbh.
+
 \subsection{Librerie CUDA}
 
 Le librerie sono comode e quelle CUDA sono accelerate dalla GPU. Le API di molte di queste sono volutamente simili a quelle della libreria standard. Permettono porting di codice da sequenziale a parallelo con \textit{minimo sforzo}, nessun tempo di mantenimento della libreria.
@@ -567,6 +575,38 @@ cudaError_t cudaDeviceGetStreamPriorityRange(
 Restituisce la minima e massima priorità del device (la più alta è la minima).
 
 \paragraph{Host Functions (Callback):} Si ha la possibilità di inserire una funzione host, senza introdurre sincronizzazione o interrompere il flusso dello stream. Questa funzione viene eseguita sull'host una volta che tutti i comandi forniti allo stream prima della chiamata sono stati eseguiti.
+
+\subsubsection{Chiamare un kernel su più Stream}
+
+Il vantaggio dell'usare gli stream risiede nella possibilità di dividere le (stesse) operazioni in "batch", aumentando il parallelismo con la possibilità di avere trasferimenti di memoria (sia H2D che D2H) concorrenti all'esecuzione del kernel stesso. 
+
+Vogliamo dividere i dati in blocchi e rendere i trasferimenti paralleli all'esecuzione, aumentando l'occupancy. Sono possibili due schemi di versioni asincrone: 
+
+\begin{minipage}{.48\linewidth}
+	Schema 1: 
+	\begin{itemize}
+		\item loop che chiama, per ogni stream: copia H2D, kernel, copia D2H
+	\end{itemize}
+\end{minipage}
+\hfill 
+\begin{minipage}{.48\linewidth}
+	Schema 2:
+	\begin{itemize}
+		\item loop per copie H2D
+		
+		\item loop per kernel
+		
+		\item loop per copie D2H
+	\end{itemize} 
+\end{minipage}
+
+Le due versioni sono funzionalmente la stessa cosa. A livello di kernel, l'unica cosa che cambia (come per tutte le volte in cui si suddivide) è da tenere conto dell'offset per considerare la "zona" assegnata a quel kernel in quello stream.
+
+\subsubsection{Convoluzione 2D con stream}
+
+Per, possibilmente, velocizzare l'operazione di convoluzione 2D un'idea è quella di suddividere su stream diversi i canali R,G,B dell'immagine. 
+
+L'esecuzione del programma fondamentalmente non cambia, ma bisogna creare gli stream necessari e chiamare più volte il kernel, ogni volta con stream diverso.
 
 \subsubsection{CUDA Event}
 
