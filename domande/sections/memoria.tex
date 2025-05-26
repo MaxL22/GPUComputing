@@ -28,7 +28,7 @@
         
         La memoria \textbf{zero copy} si basa su memoria pinned mappata nello spazio di indirizzamento del device, permette alla GPU di accedere direttamente a pagine di memoria host senza copie esplicite di memoria. Può semplificare la programmazione, ma ha latenza più alta della global memory (i dati devono passare su PCIe) e banda limitata.
         
-        La memoria \textbf{unified} è un modello di memoria automatico in cui host e device condividono lo spazio di indirizzamento, tutte le CPU e GPU del sistema possono accedere a questa memoria. Il sistema sottostante si occupa di gestire le migrazioni di memoria secondo necessità, in maniera trasparente all'applicazione. Può essere allocata con \texttt{cudaMallocManaged()} e permette di semplificare notevolmente la programmazione, evitando tutte le copie di dati esplicite, ma richiede overhead di migrazione quando viene fatto l'accesso ai dati.
+        La memoria \textbf{unified} è un modello di memoria automatico in cui host e device condividono lo spazio di indirizzamento, tutte le CPU e GPU del sistema possono accedere a questa memoria. Il sistema sottostante si occupa di gestire le migrazioni di memoria secondo necessità, in maniera trasparente all'applicazione. Può essere allocata con \texttt{cudaMallocManaged()} e permette di semplificare notevolmente la programmazione, evitando tutte le copie di dati esplicite, ma si ha overhead di migrazione quando viene fatto l'accesso ai dati.
     \end{solution}
     
     \question Come usare la shared memory per le convoluzioni.
@@ -36,11 +36,11 @@
     \begin{solution}
         Un possibile schema per la convoluzione usando la shared memory è quello del tiling: a ogni blocco della grid viene affidato un "tile" (sotto-blocco) dell'immagine in input, ogni thread nel blocco si occupa di un prodotto della convoluzione. 
         
-        In shared memory vanno caricati tutti i possibili dati a cui il blocco deve fare accesso, ovvero la porzione dell'immagine di cui si occupa, assieme all'area data dal raggio della maschera di convoluzione (un "halo" attorno al sotto-blocco stesso).
+        In shared memory vanno caricati tutti i possibili dati a cui il blocco deve fare accesso, ovvero la porzione dell'immagine di cui si occupa, assieme all'area data dal raggio della maschera di convoluzione (un "alone" attorno al sotto-blocco stesso).
         
         Rimane il problema di come caricare i blocchi in shared memory: i dati sono più del blocco stesso, sarebbe ottimale dividere il più equamente possibile il carico di lavoro. 
         
-        Un'idea può essere dare un ordine ai thread e "ripetere" il thread block sopra la sotto-matrice formata da tutti i dati da caricare.
+        Un'idea può essere dare un ordine ai thread e "ripetere" il thread block sopra la sotto-matrice formata da tutti i dati da caricare. Tiling della zona da caricare in smem.
         
         L'uso della shared memory permette di limitare gli accessi alla memoria globale, incrementando la velocità degli accessi successivi, ma sono da tenere in conto possibili bank conflict (la shared memory è divisa in bank, se due o più thread vogliono accedere alla stessa bank vanno serviti serialmente) e la quantità di memoria shared utilizzata influisce sul numero di blocchi attivi concorrentemente su un singolo SM.
     \end{solution}
@@ -71,14 +71,14 @@
             
             \item Shared memory: la si può dichiarare tramite \texttt{\_\_shared\_\_} all'interno del kernel, latenza bassa, ha scope a livello di blocco e lifetime del kernel
             
-            \item Registri: variabili locali ai thread, si tratta della memoria più veloce, ma limitata nella quantità
+            \item Registri: variabili locali ai thread, si tratta della memoria più veloce, ma di dimensione limitata
         \end{itemize}
         
         Le allocazioni dinamiche invece sono usate quando la dimensione dei dati è nota solo in esecuzione. Possono essere:
         \begin{itemize}
             \item Device malloc: tramite la primitiva \texttt{cudaMalloc()}, richiede passaggi di memoria espliciti da host a device (e viceversa, \texttt{cudaMemcpy()}), disponibile fino all'istruzione \texttt{cudaFree()}, risiede nella memoria globale del device
             
-            \item Pinned memory: non all'interno del device, ma la primitiva \texttt{cudaHostAlloc()} permette di allocare memoria non paginabile dal sistema operativo per trasferimenti più veloci
+            \item Pinned memory: non all'interno del device, ma la primitiva \texttt{cudaHostAlloc()} permette di allocare memoria non paginabile dal sistema operativo per trasferimenti più veloci; questa può essere mappata nello spazio di indirizzamento della GPU (memoria zero copy)
             
             \item Unified Memory: la primitiva \texttt{cudaMallocManaged()} permette di avere una zona di memoria con indirizzamento unico per host e device, lasciando la gestione della migrazione dei dati a CUDA; semplice da utilizzare, ma può portare a maggiori latenze se non usata correttamente
             
@@ -100,7 +100,7 @@ kernel<<<grid, block, shared_bytes>>>();
         
         Ha lo scopo di semplificare la gestione della memoria, rendendo trasparenti al programmatore i trasferimenti, gestiti da CUDA. 
         
-        La si può allocare tramite la funzione \texttt{cudaMallocManaged()}, possiede un parametro \texttt{flag} per specificare se la memoria è condivisa solo con l'host o anche con tutte le altre GPU.
+        La si può allocare tramite la funzione \texttt{cudaMallocManaged()}, è anche presente un parametro \texttt{flag} per specificare se la memoria è condivisa solo con l'host o anche con tutte le altre GPU.
         
         Semplifica lo sviluppo CUDA, ma può portare a un maggiore overhead dovuto alla migrazione (gestita a livello di pagina) rispetto alla gestione della memoria con trasferimenti espliciti.
     \end{solution}

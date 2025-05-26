@@ -31,13 +31,13 @@ grid.sync();
             
             \item \textbf{Livello di blocco}: per attendere che tutti i thread in un blocco raggiungano lo stesso punto di esecuzione. La primitiva
             \begin{minted}{c}
-__device__ void __syncthreads(void);
+__syncthreads(void);
             \end{minted}
             impone a tutti i thread nel blocco corrente di attendere fino a quando tutti gli altri thread dello stesso blocco non hanno raggiunto quel particolare punto di esecuzione. Lo scopo principale è garantire la visibilità degli accessi alla memoria (rendere visibile le modifiche), in modo da evitare conflitti e race conditions. Se non tutti i thread all'interno del blocco arrivano alla primitiva si può avere un deadlock;
             
             \item \textbf{Livello di warp}: per attendere che tutti i thread all'interno di un warp raggiungano lo stesso punto di esecuzione. La primitiva
             \begin{minted}{c}
-__device__ void __syncwarp(mask);
+__syncwarp(mask);
             \end{minted}
             permette di avere una barriera esplicita per garantire la ri-convergenza del warp per le istruzioni successive. L'argomento \texttt{mask} è composto da una sequenza di 32 bit che permette di definire quali warp partecipano alla sincronizzazione (se omessa, di default tutti, ovvero \texttt{0xFFFFFFFF}).
         \end{itemize}
@@ -48,6 +48,7 @@ __device__ void __syncwarp(mask);
             
             \item per-thread: disponibile da CUDA 7, ogni thread host ottiene il suo default stream, diventa non-bloccante rispetto agli altri stream
         \end{itemize}
+        Il comportamento può essere configurato tramite parametro durante compilazione o direttiva nel codice.
         
         Sincronizzazione \textbf{tramite eventi}: all'interno degli stream si possono creare degli eventi tramite i quali è possibile avere anche sincronizzazione:
         \begin{itemize}
@@ -111,7 +112,7 @@ cudaError_t cudaEventQuery(cudaEvent_t event)
         \end{minted}
         permette di controllare se l'evento è completato o meno in maniera non bloccante.
         
-        Rimane sempre un opzione la sincronizzazione host-side tramite \texttt{cudaDeviceSynchronize()}, da effettuare per ogni dispositivo.
+        Rimane sempre un'opzione la sincronizzazione host-side, effettuabile tramite la primitiva \texttt{cudaDeviceSynchronize()} per ogni dispositivo.
         
         Esistono inoltre primitive di sincronizzazione esplicite per kernel cooperativi multi-device (\texttt{this\_grid().sync()}).
         
@@ -127,12 +128,12 @@ cudaError_t cudaEventQuery(cudaEvent_t event)
         \begin{minted}{c}
 __syncthreads();
         \end{minted}
-        Ovvero una barriera che devo raggiungere tutti i thread prima che la computazione possa proseguire.
+        Ovvero una barriera che devono raggiungere tutti i thread prima che la computazione possa proseguire.
         
-        Se una primitiva \texttt{\_\_syncthreads()} è "nascosta" dietro a istruzioni condizionali e non viene raggiunta da tutti i thread del blocco si incorre in un deadlock: i thread che hanno raggiunto l'istruzione rimarranno fermi.
+        Se una primitiva \texttt{\_\_syncthreads()} è "nascosta" dietro a istruzioni condizionali e non viene raggiunta da tutti i thread del blocco si incorre in un deadlock: i thread che hanno raggiunto l'istruzione rimarranno fermi, gli altri non la raggiungeranno mai; la correttezza dell'uso sta al programmatore.
         
-        Non si può risolvere la divergenza a livello di blocco, anche se la sincronizzazione è posta in maniera corretta (non causa deadlock), la serializzazione dei percorsi di esecuzione avviene ugualmente. Per risolvere la divergenze si possono usare primitive di sincronizzazione a livello di warp (\texttt{\_\_syncwarp()}) o tecniche per evitare del tutto istruzioni condizionali.
+        Non si può risolvere la divergenza a livello di blocco, anche se la sincronizzazione è posta in maniera corretta (non causa deadlock), la serializzazione dei percorsi di esecuzione avviene ugualmente. 
         
-        
+        Per risolvere le divergenze si possono usare primitive di sincronizzazione a livello di warp (\texttt{\_\_syncwarp()}) o tecniche per evitare del tutto istruzioni condizionali.
     \end{solution}
 \end{questions}

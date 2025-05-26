@@ -3,13 +3,13 @@
 
 \subsection{Risorse Hardware}
 
-\paragraph{Device Query:} Per indagare le feature disponibili sul device, scoprire le proprietà. Ad esempio: quanti SM sono disponibili, quanta memoria, \dots
+\paragraph{Device Query:} Per indagare le feature presenti sul device, scoprire le proprietà. Ad esempio: quanti SM sono disponibili, quanta memoria, \dots
 
 Per farlo ci sono \href{http://docs.nvidia.com/cuda/cuda-runtime-api}{\texttt{Funzioni delle API runtime di CUDA}} e la CLI utility \href{https://developer.nvidia.com/nvidia-system-management-interface}{\texttt{nvidia-smi}}. Quest'ultimo permette di gestire e monitorare le GPU presenti.
 
 Le funzioni: 
 \begin{minted}{c}
-cudaError_t cudaGetDeviceCount(&dev_count)
+cudaError_t cudaGetDeviceCount(&dev_count);
 cudaError_t cudaGetDeviceProperties(cudaDeviceProp* prop,
     int device);
 \end{minted}
@@ -57,7 +57,9 @@ Questo ha diversi vantaggi, tra cui:
 
 Il numero di copie del corpo del loop create si chiama \textbf{unrolling factor} (quanto è stato "srotolato" il ciclo). Questa tecnica è efficace quando il numero di iterazioni è noto a priori.
 
-\paragraph{Warp unrolling:} L'ottimizzazione si può anche migliorare sfruttando il concetto di warp. Tutti i 32 thread all'interno di un solo warp eseguono lo stesso codice in maniera sincrona, si usa questa caratteristica per unrollare il codice di un ciclo in maniera esplicita, eliminando controlli ed eventuali divergenze tra thread. 
+\subsubsection{Warp unrolling}
+
+L'ottimizzazione si può anche migliorare sfruttando il concetto di warp. Tutti i 32 thread all'interno di un solo warp eseguono lo stesso codice in maniera sincrona, si usa questa caratteristica per unrollare il codice di un ciclo in maniera esplicita, eliminando controlli ed eventuali divergenze tra thread. 
 
 Dato che tutti gli warp eseguono lo stesso codice, l'unrolling garantisce che il flusso di esecuzione rimanga uniforme, riducendo la divergenza. 
 
@@ -182,17 +184,17 @@ Dove $(r,c)$ sono le coordinate del valore cercato e $M$ è l'altezza della matr
 
 \paragraph{Operare con cuBLAS:} L'iter tipico per usare cuBLAS è
 \begin{enumerate}
-	\item creare un handle con \texttt{cublasCreateHandle}
+	\item creare un handle con \texttt{cublasCreateHandle()}
 	
-	\item allocare la memoria sul device con \texttt{cudaMalloc}
+	\item allocare la memoria sul device con \texttt{cudaMalloc()}
 	
-	\item popolare la device memory con gli input necessari usando \texttt{cublasSetVector} e \texttt{cublasSetMatrix}
+	\item popolare la device memory con gli input necessari usando \texttt{cublasSetVector()} e \texttt{cublasSetMatrix()}
 	
 	\item effettuare le chiamate di libreria necessarie
 	
-	\item recuperare i risultati dalla device memory usando \texttt{cublasGetVector} e \texttt{cublasGetMatrix}
+	\item recuperare i risultati dalla device memory usando \texttt{cublasGetVector()} e \texttt{cublasGetMatrix()}
 	
-	\item rilasciare le risorse CUDA e cuBLAS con \texttt{cudaFree} e \texttt{cublasDestroy}, rispettivamente
+	\item rilasciare le risorse CUDA e cuBLAS con \texttt{cudaFree()} e \texttt{cublasDestroy()}, rispettivamente
 \end{enumerate}
 
 \paragraph{Funzioni all'interno di cuBLAS:} Per trasferire vettori da CPU a GPU:
@@ -398,7 +400,7 @@ Uno \textbf{stream CUDA} è riferito a sequenze di operazioni CUDA asincrone ese
 
 Operazioni tipiche possono essere: trasferimento dati, lancio kernel, gestione eventi di sincronizzazione. L'esecuzione di operazioni in uno stream è sempre asincrona rispetto all'host.
 
-Le operazioni appartenenti a stream distinti non hanno restrizioni sull'ordine di esecuzione l'uno con l'altro (ma possono essere imposte); ogni stream è asincrono rispetto all'host e sono tutti indipendenti l'uno con l'altro.
+Le operazioni appartenenti a stream distinti non hanno restrizioni sull'ordine di esecuzione l'uno con l'altro (ma possono essere imposte); tutti gli stream sono asincroni rispetto all'host indipendenti l'uno con l'altro.
 
 \paragraph{Parallelismo Grid-level:} Dal punto di vista CUDA le operazioni di stream distinti vengono eseguite in parallelo (concorrentemente). I comandi immessi su uno stream possono essere eseguiti quando tutte le dipendenze del comando sono soddisfatte. Le dipendenze possono essere comandi lanciati in precedenza sullo stesso flusso o dipendenze da altri flussi; i.e., ogni stream è indipendente da tutti gli altri, idealmente vengono eseguiti tutti in parallelo.
 
@@ -524,7 +526,7 @@ Per questo gli stream non-NULL possono essere di due tipi:
 	\item \textbf{Non-blocking} stream: lo stream NULL non è bloccante
 \end{itemize}
 
-Gli stream creati usando \texttt{cudaStreamCreate} sono bloccanti: l'esecuzione di operazioni in questi stream vengono bloccate in attesa del completamento di operazioni dello stream NULL.  
+Gli stream creati usando \texttt{cudaStreamCreate()} sono bloccanti: l'esecuzione di operazioni in questi stream vengono bloccate in attesa del completamento di operazioni dello stream NULL.  
 
 Il NULL stream è implicitamente definito e sincronizza con tutti gli altri stream bloccanti nello stesso contesto CUDA. In generale il NULL stream non si sovrappone con nessun altro stream bloccante.
 
@@ -546,14 +548,14 @@ Inoltre, in generale, stream non-NULL sono tra loro non bloccanti.
 
 \paragraph{Post Cuda 7:} Prima di CUDA 7, ogni device ha un singolo default stream usato per tutti i thread dell'host che causano sincronizzazione implicita. 
 
-CUDA 7 ha introdotto la nuova opzione \texttt{per-thread default stream}, che ha due effetti:
+CUDA 7 ha introdotto la nuova opzione \texttt{per-thread} default stream, che ha due effetti:
 \begin{enumerate}
-	\item Assegna a ogni thread dell'host il proprio default stream (comandi inviati al default stream da diversi thread dell'host possono eseguire concorrentemente)
+	\item Assegna a ogni thread dell'host il proprio default stream (comandi inviati al default stream da diversi thread dell'host possono essere eseguiti concorrentemente)
 	
-	\item I default stream sono stream regolari (comandi nel default stream possono eseguire in concorrenza con quelli in un non-default stream)
+	\item I default stream sono stream regolari (comandi nel default stream possono essere eseguiti concorrentemente a quelli in stream non-default)
 \end{enumerate}
 
-Per abilitare per-thread default stream compilare con \texttt{nvcc} command-line option \texttt{--default-stream per-thread}, o definire la macro per il preprocessore \texttt{\#define CUDA\_API\_PER\_THREAD\_DEFAULT\_STREAM}.\\
+Per abilitare per-thread default stream compilare con \texttt{nvcc} command-line option \texttt{--default-stream per-thread}, o definire la macro per il preprocessore \texttt{\#define CUDA\_API\_PER\_THREAD\_DEFAULT\_STREAM}.
 
 \paragraph{Priorità negli stream:} Si possono creare stream con priorità (da CC 3.5). Una grid con più alta priorità può prelazionare il lavoro già in esecuzione con più bassa priorità. 
 
@@ -582,14 +584,14 @@ Il vantaggio dell'usare gli stream risiede nella possibilità di dividere le (st
 
 Vogliamo dividere i dati in blocchi e rendere i trasferimenti paralleli all'esecuzione, aumentando l'occupancy. Sono possibili due schemi di versioni asincrone: 
 
-\begin{minipage}{.48\linewidth}
+\begin{minipage}{.4\linewidth}
 	Schema 1: 
 	\begin{itemize}
 		\item loop che chiama, per ogni stream: copia H2D, kernel, copia D2H
 	\end{itemize}
 \end{minipage}
 \hfill 
-\begin{minipage}{.48\linewidth}
+\begin{minipage}{.4\linewidth}
 	Schema 2:
 	\begin{itemize}
 		\item loop per copie H2D
@@ -647,17 +649,17 @@ cudaError_t cudaEventRecord(
 
 Poi si possono usare altre funzioni per:
 \begin{itemize}
-	\item sincronizzare l'host rispetto all'evento, bloccarlo finché non si verifica l'evento
+	\item Sincronizzare l'host rispetto all'evento, bloccarlo finché non si verifica l'evento
 	\begin{minted}{c}
 cudaError_t cudaEventSynchronize(cudaEvent_t event);
 	\end{minted}
 	
-	\item controllare l'avvenimento di un evento, senza bloccare
+	\item Controllare l'avvenimento di un evento, senza bloccare
 	\begin{minted}{c}
 cudaError_t cudaEventQuery(cudaEvent_t event);
 	\end{minted}
 	
-	\item far attendere uno stream sull'occorrenza dell'evento su un altro stream
+	\item Far attendere uno stream sull'occorrenza dell'evento su un altro stream
 	\begin{minted}{c}
 cudaError_t cudaStreamWaitEvent(
     cudaStream_t stream , cudaEvent_t event);
@@ -680,7 +682,7 @@ Si può bloccare l'host fino a che il device non ha completato i task precedenti
 cudaError_t cudaDeviceSynchronize(void);
 \end{minted}
 
-Si può bloccare l'host fino a che tutte le operazioni in uno stream sono completate (\texttt{cudaStreamSynchronize}) oppure eseguire un test non-bloccante (\texttt{cudaStreamQuery}):
+Si può bloccare l'host fino a che tutte le operazioni in uno stream sono completate (\texttt{cudaStreamSynchronize()}) oppure eseguire un test non-bloccante (\texttt{cudaStreamQuery()}):
 \begin{minted}{c}
 cudaError_t cudaStreamSynchronize(cudaStream_t stream);
 cudaError_t cudaStreamQuery(cudaStream_t stream);

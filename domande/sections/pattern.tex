@@ -144,7 +144,7 @@
     \question Spiega l'ordinamento bitonico
     
     \begin{solution}
-        A partire da una sequenza qualsiasi, si può creare una sequenza bitonica tramite una rete con $\log_2 n - 1$ colonne in cui ogni $i$-esima colonna usa $\oplus BM [2^i]$ e $\ominus BM [2^i]$ alternati su tutto l'input per creare sequenze bitoniche lunghe $2^{i+1}$ (a partire da $i=0$, un valore è banalmente una sequenza bitonica).
+        A partire da una sequenza qualsiasi, si può creare una sequenza bitonica tramite una rete con $\log_2 n - 1$ colonne in cui ogni $i$-esima colonna usa $\oplus BM [2^i]$ e $\ominus BM [2^i]$ alternati su tutto l'input per creare sequenze bitoniche lunghe $2^{i+1}$ (a partire da $i=0$, un valore singolo soddisfa banalmente le proprietà di una sequenza bitonica).
         
         Alla fine si ha una sequenza bitonica ordinabile con una bitonic merging network $\oplus BM [n]$ (o $\ominus BM [n]$).
         

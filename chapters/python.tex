@@ -5,13 +5,13 @@ L'idea è quella di avere codice python che sfrutta runtime CUDA per sfruttare i
 
 \paragraph{pyCUDA:} L'idea di PyCUDA è di fare un "wrap" del codice C.
 
-\paragraph{PyTorch:} Uno dei più usati, spesso per il ML, orientato anche a non programmatori CUDA (generalmente chi lo usa lo fa in modo trasparente, senza sapere il funzionamento della GPU sottostante). L'idea è quella di replicare librerie all'interno di torch, usando CUDA in maniera trasparente (ad esempio numPy).
+\paragraph{PyTorch:} Uno dei più usati, spesso per il ML, orientato anche a non programmatori CUDA (generalmente chi lo usa lo fa in modo trasparente, senza sapere il funzionamento della GPU sottostante). L'idea è quella di replicare librerie all'interno di torch, usando CUDA (e.g., NumPy).
 
 \paragraph{Rapids:} Azienda che produce molteplici software, include alcune librerie come CuPy (NumPy e SciPy su GPU). 
 
 \subsection{Numba for CPU}
 
-Per la CPU, Numba nasce con l'idea di accelerare tramite parallelismo su CPU.  Numba è un package compilato Just-In-Time, non richiede uno step di compilazione dedicato, compila solo le funzioni che servono, usa LLVM per la traduzione a linguaggio macchina. Numba si integra con l'ecosistema python (NumPy, Pandas, \dots) e permette di usare solo codice Python per fare tutto.
+Per la CPU, Numba nasce con l'idea di accelerare tramite parallelismo su CPU.  Numba è un package compilato Just-In-Time, non richiede uno step di compilazione dedicato, compila solo le funzioni che servono, usa LLVM per la traduzione a linguaggio macchina. Numba si integra con l'ecosistema python (NumPy, Pandas, \dots) e permette di usare solo codice Python per fare \textit{tutto}.
 
 \paragraph{Decoratori in Python:} Un decoratore è un oggetto usato per modificare una funzione, metodo o classe per trasformarla. Per Numba, si usa il decoratore \texttt{@numba.jit} prima della funzione. 
 
@@ -69,9 +69,7 @@ Mentre le posizioni assolute si possono ottenere con:
 	\item \texttt{numba.cuda.gridsize(ndim)}: torna la dimensione assoluta ("forma") in thread dell'intera griglia di blocchi
 \end{itemize}
 
-Vale la pena ricordare che in Python il tipo di default è \texttt{f64} (o qualcosa di simile, idk), quindi senza specificare il tipo anche la libreria userà quello come tipo.
-
-Magari non è richiesta tale precisione (in genere in CUDA non si lavora con f64), quindi bisogna specificare esplicitamente il tipo. Ad esempio usando \texttt{.astype(np.float32)}.
+Vale la pena ricordare che in Python il tipo di default è \texttt{f64} (o qualcosa di simile, idk), quindi senza specificare il tipo anche la libreria userà quello come tipo. Se tale precisione non è richiesta (in genere in CUDA non si lavora con \texttt{f64}) bisogna specificare esplicitamente il tipo. Ad esempio usando \texttt{.astype(np.float32)}.
 
 \paragraph{Funzioni device:} Si possono scrivere funzioni richiamabili solo dall'interno del device, con il decoratore \texttt{@cuda.jit(device=True)}, ad esempio:
 \begin{minted}{python}

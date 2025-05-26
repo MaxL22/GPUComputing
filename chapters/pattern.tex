@@ -89,18 +89,18 @@ Quindi peggiore del caso sequenziale: poco efficiente.
 
 Per evitare il fattore $\log_2 n$ extra dell'algoritmo naive, si usano \textbf{alberi bilanciati}: viene costruito un binary tree bilanciato sui dati in input e viene "passato" da e verso la radice per computare le somme prefisse.
 
-Un albero binario con $n$ foglie ha $d = \log_2 n$ livelli, ogni livello $d$ ha $2^d$ nodi. Viene effettuata una somma per nodo, quindi in totale $O(n)$.
+%Un albero binario con $n$ foglie ha $d = \log_2 n$ livelli, ogni livello $d$ ha $2^d$ nodi. Viene effettuata una somma per nodo, quindi in totale $O(n)$.
 
 Non si memorizza l'albero come struttura dati effettiva, è solo un concetto usato per determinare cosa devono fare i thread a ciascun passaggio. 
 
 L'algoritmo consiste di due fasi:
 \begin{itemize}
-    \item fase di reduce o \textbf{up-sweep}: per costruire le somme parziali fino alla radice
+    \item fase di \textbf{reduce} o \textbf{up-sweep}: per costruire le somme parziali fino alla radice
     
     \item \textbf{down-sweep}: per distribuire i prefissi corretti alle foglie
 \end{itemize}
 
-Gli $n$ elementi in input vengono rappresentati come foglie di un albero binario pieno di altezza $d$.
+Gli $n$ elementi in input vengono rappresentati come foglie di un albero binario pieno di altezza $d = \log_2 n$.
 
 \paragraph{Fase di up-sweep:} Si scorrono i livelli da foglie a radice: a livello $i$, ogni nodo $j$, calcola
 $$ T[i][j] = T[i-1][2j] + T[i-1][2j + 1] $$
@@ -182,7 +182,7 @@ Per un grafo sparso e con distribuzioni casuali dei pesi converge con alta proba
 
 Pseudocodice:
 \begin{center}
-    \begin{minipage}{.7\textwidth}
+    \begin{minipage}{.81\textwidth}
         \begin{tcolorbox}[
             colback=white,
             sharp corners,
@@ -257,7 +257,42 @@ Schema dell'algoritmo:
     \item Termina quando non rimane alcun vertice attivo $C = \emptyset$: la soluzione $S$ è un MIS
 \end{enumerate}
 
-L'algoritmo molto probabilmente finisce in $O(\log |V|)$ round. A ogni iterazione, una frazione dei nodi viene eliminata, portando a una terminazione "rapida".
+L'algoritmo \textit{molto probabilmente} finisce in $O(\log |V|)$ round. A ogni iterazione, una frazione dei nodi viene eliminata, portando a una terminazione "rapida".
+
+Pseudocodice:
+\begin{center}
+    \begin{minipage}{.63\textwidth}
+        \begin{tcolorbox}[
+            colback=white,
+            sharp corners,
+            boxrule=.3mm,
+            left=20pt,
+            top=0pt,
+            bottom=0pt,
+            colbacktitle=white,
+            coltitle=black
+            ]
+            \LinesNumbered
+            \begin{algorithm}[H]
+                \SetAlgoNoEnd
+                \SetKwSty{texttt}
+                \SetArgSty{relax}
+                $S \leftarrow \emptyset$; \\
+                $C \leftarrow V$; \\
+                \While{$C \neq \emptyset$}{
+                    $r(v) \leftarrow$ \texttt{rand()}, $\forall v \in C$; \\
+                    \If{$r(v) < r(u)$, $\forall u \in N(v)$}{
+                        $S \leftarrow S \cup \{v\}$;\\
+                        $C \leftarrow C - (\{v\} \cup N(v))$; \\
+                    }
+                }
+                \Return{$S$}
+            \end{algorithm}
+        \end{tcolorbox}
+    \end{minipage}
+\end{center}
+
+La fase di decisione può essere svolta in parallelo.
 
 \subsection{Sorting}
 
@@ -318,7 +353,9 @@ Per una rete con $n$ fili, $\oplus BM [n]$, (quindi sequenza bitonica lunga $n$ 
     \item $n/2$ comparatori per colonna
 \end{itemize}
 
-Ogni colonna ha comparatori a distanza pari a metà della colonna precedente (per $n=16$, prima colonna a distanza $8$, seconda a distanza $4$, \dots, fino a distanza 1 in $\log_2 n$ passi). Esempio per rete con $n = 16$:
+Ogni colonna ha comparatori a distanza pari a metà della colonna precedente, a partire da $n/2$ (per $n=16$, prima colonna a distanza $8$, seconda a distanza $4$, \dots, fino a distanza 1 in $\log_2 n$ passi). 
+
+Esempio per rete con $n = 16$:
 \begin{center}
     \includegraphics[width=0.79\columnwidth]{img/pattern/n16}
 \end{center}
