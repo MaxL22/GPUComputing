@@ -136,4 +136,26 @@ __syncthreads();
         
         Per risolvere le divergenze si possono usare primitive di sincronizzazione a livello di warp (\texttt{\_\_syncwarp()}) o tecniche per evitare del tutto istruzioni condizionali.
     \end{solution}
+    
+    \question Cosa sono e per cosa si utilizzano gli eventi.
+    
+    \begin{solution}
+        Un evento è un marker all'interno di uno stream associato a un punto del flusso di operazioni. Possono assumere due stati: occorso/non occorso. I due utilizzi principali sono: 
+        \begin{itemize}
+            \item Sincronizzare l'esecuzione tra stream: si può avere sincronizzazione esplicita tra stream tramite gli eventi, la primitiva
+            \begin{minted}{cuda}
+cudaError_t cudaStreamWaitEvent(
+    cudaStream_t stream , cudaEvent_t event);
+            \end{minted}
+            permette di far attendere a uno stream l'occorrenza di un evento su un altro stream (non necessariamente sulla stessa GPU)
+            
+            \item Monitorare il progresso del device: dal lato host si possono usare le primitive
+            \begin{minted}{cuda}
+cudaError_t cudaEventSynchronize(cudaEvent_t event);
+cudaError_t cudaEventQuery(cudaEvent_t event);
+            \end{minted}
+            per, rispettivamente, bloccare l'host fino all'occorrenza di un evento oppure controllarne l'avvenimento in maniera non bloccante
+        \end{itemize}
+    \end{solution}
+    
 \end{questions}

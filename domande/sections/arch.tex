@@ -147,12 +147,12 @@ float* C, int N) {
     	Inoltre, uno SM decide quali warp mandare in esecuzione tra quelli candidati/pronti, rendendo inattivi gli warp che richiedono attesa, mascherando così la latenza dovuta a operazioni come trasferimenti di memoria. Si vuole massimizzare l'occupancy, ovvero il rapporto tra thread attivi e thread massimi sostenibili, misurato in warp. 
     \end{solution}
     
-    \question Esempio e vantaggi di loop unrolling.
+    \question Esempio e vantaggi di loop unrolling. Esempio nella reduction.
     
     \begin{solution}
     	Il loop unrolling è una tecnica usata per ottimizzare i cicli: questi vengono "srotolati" in modo da ridurre l'overhead dovuto alle operazioni di controllo, ridurre il branching e i salti condizionali, aumentando così il livello di parallelismo. Si copia il corpo del loop un numero $n$ di volte, chiamato unroll factor. Lo si può fare manualmente, in alternativa, CUDA fornisce direttive di compilazione.
     	
-    	Esempio di loop unrolling: 
+    	Esempio semplice di loop unrolling: 
     	\begin{minted}{cuda}
 for (int i = 0; i < 4; i++){
     A[base] += B[base + i];
@@ -167,6 +167,46 @@ A[base] += B[base + 3];
     	\end{minted}
     	
     	Lo si dovrebbe usare quando il corpo del ciclo è semplice e il numero di iterazioni è multiplo dell'unroll factor. Un unrolling troppo spinto potrebbe causare bloating del codice e riduzione delle performance dovuta a mancanza di spazio in cache/instruction buffer.
+        
+        Esempio nella reduction: loop all'interno del kernel, prima dell'unroll
+        \begin{minted}{cuda}
+for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+    if (threadIdx.x < stride) {
+        smem[threadIdx.x] += smem[threadIdx.x + stride];
+    }
+    __syncthreads();
+}
+        \end{minted}
+        
+        Mentre la versione con unroll è
+        \begin{minted}{cuda}
+if (blockDim.x >= 1024 && threadIdx.x < 512) {
+    smem[threadIdx.x] += smem[threadIdx.x + 512];
+    __syncthreads();
+}
+if (blockDim.x >= 512 && threadIdx.x < 256) {
+    smem[threadIdx.x] += smem[threadIdx.x + 256];
+    __syncthreads();
+}
+if (blockDim.x >= 256 && threadIdx.x < 128) {
+    smem[threadIdx.x] += smem[threadIdx.x + 128];
+    __syncthreads();
+}
+if (blockDim.x >= 128 && threadIdx.x < 64) {
+    smem[threadIdx.x] += smem[threadIdx.x + 64];
+    __syncthreads();
+}
+// Within a single warp
+if (threadIdx.x < 32) {
+    volatile float *vsmem = smem;
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 32];
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 16];
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 8];
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 4];
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 2];
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 1];
+}
+        \end{minted}
     \end{solution}
     
     \question Cos'è la scalabilità? Come vengono misurati i tempi e lo speedup.
@@ -204,4 +244,13 @@ A[base] += B[base + 3];
     	
     	Quest'ultimo incremento deve essere atomico, altrimenti si potrebbe incorrere in race conditions e di conseguenza valori non consistenti al termine dell'esecuzione.
     \end{solution}
+    
+    \question Cosa indica la compute capability di una GPU.
+    
+    \begin{solution}
+        Con il termine "compute capability" si intende la versione dell'architettura CUDA supportata da una GPU Nvidia, espressa sotto forma di numero.
+        
+        Permette di stabilire le feature e funzionalità hardware disponibili. Viene usato in fase di compilazione per stabilire l'architettura per cui compilare.
+    \end{solution}
+    
 \end{questions}

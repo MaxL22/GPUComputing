@@ -187,4 +187,24 @@ kernel<<<grid, block, shared_bytes>>>();
     		\end{minipage}
     	\end{center}
     \end{solution}
+    
+    \question Constant memory e suo utilizzo.
+    
+    \begin{solution}
+        Si tratta di una memoria che risiede nella device memory, con una cache dedicata per ogni SM. La si può definire tramite l'attributo \texttt{\_\_constant\_\_}, permette di ospitare dati di sola lettura, ideale per accessi uniformi. Ha scope globale, va dichiarata al di fuori dei kernel e staticamente.
+        
+        Ideale per quando tutti i thread all'interno di un warp devono leggere dallo stesso indirizzo di memoria, raggiungendo efficienza simile a quella dei registri, altrimenti le letture vengono serializzate, degradando significativamente le performance.
+        
+        Può essere inizializzata dall'host usando
+        \begin{minted}{cuda}
+cudaError_t cudaMemcpyToSymbol(const void* symbol,
+    const void* src, size_t count);
+        \end{minted}
+        Si può anche leggere lato host tramite
+        \begin{minted}{cuda}
+cudaError_t cudaMemcpyFromSymbol(const void* dst, 
+    const void* symbol, size_t count);
+        \end{minted}
+    \end{solution}
+    
 \end{questions}

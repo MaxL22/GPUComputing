@@ -79,4 +79,18 @@ cudaFree(d_dice);
 cudaFreeHost(h_dice);
         \end{minted}
     \end{solution}
+    
+    \question Dire a cosa serve la libreria cuBLAS.
+    
+    \begin{solution}
+        La libreria cuBLAS, sviluppata da Nvidia, è un'implementazione accelerata su GPU dei Basic Linear Algebra Subproblem, quindi fornisce API per la risoluzione di problemi di algebra lineare, divisa in 3 livelli: 
+        \begin{enumerate}
+            \item Operazioni vettore-vettore
+            
+            \item Operazioni vettore-matrice
+            
+            \item Operazioni matrice-matrice
+        \end{enumerate}
+    \end{solution}
+    
 \end{questions}

@@ -1,39 +1,36 @@
-% Domande in dubbio:
-% - schema di utilizzo di più gpu, ad esempio per la somma di due vettori
-%		Lo ha spiegato?
-% - Sincronizzazione a due livelli di CUDA.
-% 		Cosa vuol dire?
-% - Uso degli stream per il prodotto di matrici diagonali a blocchi.
-%		Non penso lo abbia spiegato? Ho un fever dream a riguardo, ma non trovo nulla al momento
-%       Nel lab1 c'è qualcosa, ma senza stream
-
-Maybe maybe:
+Domande in dubbio:
 - mostrare il pseudo codice dell'algoritmo di boruvka
+    NSY
 - Fare uno schema di una BFS parallela
+    NSY
 - DAG nella rappresentazione di task
+    What
 - Come risolvere il problema di calcolare la media di 1M immagini di dimensione fissata
+    What
+- Descrivere un algoritmo di sorting parallelo.
+    Ok questa la so, ma ce ne sono altri?
+- Sincronizzazione a due livelli di CUDA.
+    Cosa vuol dire?
+
+
+
+
+- Uso degli stream per il prodotto di matrici diagonali a blocchi.
 
 - pseudocodice del trasferimento in memoria shared per il prodotto matriciale 
-- pseudocodice di jones-plassman per la colorazione parallela
 - uso degli stream per il prodotto di matrici diagonali a blocchi
 
-- Cosa sono e per cosa si utilizzano gli eventi 
-- Constant memory e suo utilizzo
 - Come vengono schedulati i blocchi sugli SM 
-- Loop unrolling ed esempio nella riduzione
-- Dire a cosa serve la libreria cuBLAS
 
 - Somma di matrici utilizzando numba
 
 - Come viene mappata logicamente e fisicamente la shared Memory
 - Codice kernel del prodotto(?) di matrici triangolari superiori (credo fosse il prodotto)
-- Cosa indica la compute capability di una GPU
 
 - architettura SMEM
 - modalità di accesso a GMEM con distinzione lettura/scrittura
 - commentare un kernel CUDA python semplice
 - che livello di concorrenza permettono di ottenere i CUDA streams
-- operazioni che offre cublas e come utilizzare la libreria
 - vantaggi unified Memory ed esempio di utilizzo
 
 - Quali unità HW troviamo all'interno di uno streaming multiprocessor (SM) di cui è composta la GPU?
@@ -42,15 +39,12 @@ Maybe maybe:
     @cuda.jit
     def matsum (A, B) :
 
-- Descrivere un algoritmo di sorting parallelo.
 - Illustrare il concetto di parallel reduction.
 - Mostrare un uso pratico degli stream CUDA.
-- Dare lo schema dell'algoritmo di Jones-Plassmann per la colorazione in parallelo di un grafo.
 
 - organizzazione dei thread in cuda, come conviene organizzarli per lavorare su matrici
 - come può la divergenza causare deadlock
 - come si usa la SMEM
-- cos'è loop unrolling + esempio
 
 - Mostrare il grafico del parallelismo dinamico nel caso di prodotto matriciale con matrici diagonali a blocco MQDB
 - Mostrare il grafico del stream CUDA nel caso di blocco MQDB
