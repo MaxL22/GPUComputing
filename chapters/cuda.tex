@@ -116,7 +116,7 @@ Possiamo tradurlo in un indice unico per i thread: per griglie e blocchi a 1D ci
 Si può ovviamente scalare a più dimensioni, per ottenere un'indicizzamento unico tra tutte le dimensioni. 
 
 \paragraph{Lanciare un kernel:} Per lanciare un kernel CUDA si aggiungono tra triple parentesi angolari le dimensioni di grid e block.
-\begin{minted}{c}
+\begin{minted}{cuda}
 kernel_name <<<grid, block>>>(argument list);
 \end{minted}
 
@@ -161,10 +161,10 @@ Proprietà dei kernel:
 	\item Esibisce un comportamento asincrono rispetto all'host
 \end{itemize}
 
-\paragraph{Gestione degli errori:} Si ha un \texttt{enum cudaError\_t} come valore di ritorno di ogni chiamata cuda. Può essere \texttt{success} o \texttt{cudaErrorMemoryAllocation}. Si può usare {cudaError\_t cudaGetLastError(void)} per ottenere il codice dell'ultimo errore.
+\paragraph{Gestione degli errori:} Si ha un \texttt{enum cudaError\_t} come valore di ritorno di ogni chiamata cuda. Può essere \texttt{success} o un valore di tipo \texttt{cudaError\_t}. Si può usare \texttt{cudaError\_t cudaGetLastError(void)} per ottenere il codice dell'ultimo errore.
 
 \paragraph{Misurare tempo con la CPU:} Per misurare il tempo di esecuzione con la CPU serve aspettare il termine dell'esecuzione del kernel lanciato, quindi bisogna sincronizzare host e device prima di prendere il tempo di fine:
-\begin{minted}{c}
+\begin{minted}{cuda}
 double iStart = cpuSecond();
 kernel_name<<<grid, block>>>(argument list);
 cudaDeviceSynchronize();
@@ -260,19 +260,19 @@ La griglia viene suddivisa in blocchi, il blocco in thread, i blocchi vanno all'
 Si possono avere più livelli di sincronizzazione:
 \begin{itemize}
 	\item \textbf{System-level}: attesa che venga completato un dato task su entrambi host e device
-	\begin{minted}{c}
+	\begin{minted}{cuda}
 cudaError_t cudaDeviceSynchronize(void);
 	\end{minted}
 	Blocca l'applicazione host finché tutte le operazioni CUDA non sono completate;
 	
 	\item \textbf{Block-level}: attesa che tutti i thread in un blocco raggiungano lo stesso punto di esecuzione
-	\begin{minted}{c}
+	\begin{minted}{cuda}
 __device__ void __syncthreads(void);
 	\end{minted}
 	Sincronizza i thread all'interno di un blocco: attende fino a che tutti raggiungono il punto di sincronizzazione
 	
 	\item \textbf{Warp-level}: attesa che tutti i thread in un warp raggiungano lo stesso punto di esecuzione
-	\begin{minted}{c}
+	\begin{minted}{cuda}
 __device__ void __syncwarp(mask);
 	\end{minted}
 	Sincronizza i thread all'interno di un warp: attende fino a che tutti raggiungono il punto di sincronizzazione (riconverge)
@@ -316,7 +316,7 @@ Queste presupponendo che la lunghezza del vettore sia una potenza di 2 e che $i$
 \end{itemize}
 
 Un possibile codice:
-\begin{minted}{c}
+\begin{minted}{cuda}
 for (int stride = 1; stride < blockDim.x; stride *= 2) {
     if ((tid % (2 * stride)) == 0)
         idata[tid] += idata[tid + stride];
@@ -326,12 +326,13 @@ for (int stride = 1; stride < blockDim.x; stride *= 2) {
 Questa soluzione può introdurre divergenza crescente a livello di warp: i thread attivi sono "distanti" a livello di warp, nel primo passo si attivano solo i thread con indici pari, nella seconda iterazione solo la metà pari degli indici precedenti (un quarto dei thread), \dots
 
 Vogliamo eliminare la divergenza, fondamentalmente usando thread adiacenti (quindi all'interno dello stesso warp): "convertiamo" gli indici in modo da usare sempre i \texttt{tid} più bassi possibili:
-\begin{minted}{c}
+\begin{minted}{cuda}
 for (int stride = 1; stride < blockDim.x; stride *= 2) {
     int index = 2 * stride * tid;
     if (index < blockDim.x)
         idata[index] += idata[index + stride];
     __syncthreads();
+}
 \end{minted}
 
 Da notare come viene eliminata la clausola \texttt{if} in tutti i thread. La locazione delle somme parziali non cambia, viene modificato solo l'indice dei thread.
@@ -365,7 +366,7 @@ Per calcolare l'istogramma bisogna:
 L'idea è molto semplice: si alloca una struttura dati (array lungo \texttt{3 * 256}) per mantenere i valori dell'istogramma e, per ogni pixel dell'immagine si effettua una \texttt{atomicAdd()} per incrementare il valore della frequenza dei colori presenti nel pixel. 
 
 Esempio per una immagine PPM: 
-\begin{minted}{c}
+\begin{minted}{cuda}
 __global__ void ppm_histGPU(PPM ppm, int *histogram) {
 	uint x = blockIdx.x * blockDim.x + threadIdx.x;
 	
@@ -483,12 +484,12 @@ L'hardware effettua tante transazioni quante ne sono necessarie per eliminare i 
 Se statica, può essere 1D, 2D o 3D, con dimensione nota compile time.
 
 \paragraph{Allocazione dinamica:} Per allocare la shared memory dinamicamente (in bytes), occorre indicare un terzo argomento all'interno della chiamata del kernel:
-\begin{minted}{c}
+\begin{minted}{cuda}
 kernel <<<grid, block, N*sizeof(int)>>>(...)
 \end{minted}
 
 Se la dimensione non è nota compile time, è possibile dichiarare una variabile adimensionale con la keyword \texttt{extern}. Dinamicamente si possono allocare solo array 1D.
-\begin{minted}{c}
+\begin{minted}{cuda}
 extern __shared__ float s[];
 \end{minted}
 
@@ -519,7 +520,7 @@ Ci sono sempre problemi di bordo: cosa faccio quando la maschera considerata arr
 
 I dati da caricare in smem sono più dei thread nel blocco ("alone" che va al di fuori del blocco di dati stesso); in smem carico tutti i possibili dati a cui il blocco deve fare l'accesso. 
 
-Chi carica che dati in memoria? I dati esterni al blocco potrebbero essere anche più del blocco stesso (maschera "grossa"). La soluzione è dare un ordine ai thread e dividere il più equamente possibile i caricamenti in memoria tra i thread del blocco.
+Chi carica che dati in memoria? I dati esterni al blocco potrebbero essere anche più del blocco stesso (maschera "grossa"). La soluzione è dare un ordine ai thread e dividere il più equamente possibile i caricamenti in memoria tra i thread del blocco. Si può fare facendo un tiling dei dati da caricare: il blocco viene "ripetuto" sui dati da caricare, secondo un ordine dei thread.
 
 \subsubsection{Prodotto matriciale con SMEM}
 
@@ -558,7 +559,7 @@ Pseudocodice del kernel:
 					}
 					\texttt{\_\_syncthreads()};\\
 				}
-				\tcp*{Srivere il risultato in memoria globale}
+				\texttt{// Scrivere il risultato in memoria globale}
 			\end{algorithm}
 		\end{tcolorbox}
 	\end{minipage}
@@ -612,7 +613,7 @@ Da CC 2.0 ci sono parti poste in cache L1 a livello di SM e in cache L2 a livell
 Ospita dati in sola lettura, ideale per accessi uniformi. Ha scope globale, va dichiarata al di fuori di qualsiasi kernel e viene dichiarata staticamente, quindi è visibile a tutti i kernel nella stessa unità di compilazione.
 
 La constant memory può essere inizializzata dall'host usando:
-\begin{minted}{c}
+\begin{minted}{cuda}
 cudaError_t cudaMemcpyToSymbol(const void* symbol,
     const void* src, size_t count)
 \end{minted}
@@ -636,7 +637,7 @@ Ottimizzata per la località spaziale 2D, quindi dati espressi sotto forma di ma
 Corrisponde alla memoria fisica, con "global" si intende una divisione logica. L'accesso da parte di thread appartenenti a blocchi distinti può potenzialmente portare a modifiche incoerenti. La global memory è accessibile attraverso transazioni da 32, 64, o 128 byte; le transazioni avvengono solo per gruppi di valori, non si può accedere a un valore singolo.
 
 I valori contenuti nella memoria allocata non sono inizializzati, ma si possono inizializzare con dati provenienti dall'host (\texttt{cudaMemcpy}) oppure con un valore specifico
-\begin{minted}{c}
+\begin{minted}{cuda}
 cudaError_t cudaMemset(void* devPtr, int value, size_t count)
 \end{minted}
 
@@ -678,12 +679,12 @@ Si vuole evitare il page fault della virtual memory (CPU, di default la memoria 
 Una volta "pinnata", la memoria non sparirà dal sistema di virtualizzazione automatico della memoria host, quindi si può lavorare su quella memoria in maniera asincrona. La pinned memory può essere acceduta direttamente dal device, in modalità asincrona. Può essere letta e scritta con una bandwidth più alta rispetto alla memoria paginabile.
 
 Da notare che eccessi di allocazione di pinned memory potrebbero far degradare le prestazioni dell'host (ridurre la memoria paginabile inficia l'uso della virtual memory), Per allocare esplicitamente memoria pinned:
-\begin{minted}{c}
+\begin{minted}{cuda}
 cudaError_t cudaMallocHost(void **devPtr, size_t count);
 \end{minted}
 
 E per deallocarla:
-\begin{minted}{c}
+\begin{minted}{cuda}
 cudaError_t cudaFreeHost(void *devPtr);
 \end{minted}
 
@@ -707,7 +708,7 @@ Con "\textbf{Managed Memory}" si fa riferimento ad allocazioni della unified mem
 Tutte le operazioni CUDA valide sulla memoria del dispositivo sono valide anche sulla memoria managed.
 
 Per fare allocazione dinamica:
-\begin{minted}{c}
+\begin{minted}{cuda}
 cudaError_t cudaMallocManaged(void **devPtr, size_t size, 
     unsigned int flags=0)
 \end{minted}
@@ -771,7 +772,7 @@ Quando forzati a fare accessi (letture/scritture) non coalescenti si può usare 
 \paragraph{AoS vs SoA:} I dati possono essere divisi in: 
 \begin{itemize}
 	\item \textbf{Array of Structures AoS}:
-	\begin{minted}{c}
+	\begin{minted}{cuda}
 struct Particle { float x, y, z; };
 Particle* P;
 float x = P[idx].x;  // stride = sizeof(Particle)
@@ -779,7 +780,7 @@ float x = P[idx].x;  // stride = sizeof(Particle)
 	Questo porta a distanza tra accessi (stride) alta, rompendo la coalescenza
 	
 	\item \textbf{Structure of Arrays SoA}:
-	\begin{minted}{c}
+	\begin{minted}{cuda}
 float *Px, *Py, *Pz;
 float x = Px[idx];   // stride = 1
 	\end{minted}
@@ -808,7 +809,7 @@ Un'idea per risolvere il problema può essere:
 \end{itemize}
 
 Esempio:
-\begin{minted}{c}
+\begin{minted}{cuda}
 __shared__ float tile[BDIMY][BDIMX];
 // Coordinate originali
 int y = blockIdx.y * blockDim.y + threadIdx.y;

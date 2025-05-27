@@ -52,7 +52,7 @@
     
     \begin{solution}
         Seguendo l'iter tipico di utilizzo di cuRAND:
-        \begin{minted}{c}
+        \begin{minted}{cuda}
 // Set up di cuRAND
 curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT);
 curandSetPseudoRandomGeneratorSeed(generator, seed_value);

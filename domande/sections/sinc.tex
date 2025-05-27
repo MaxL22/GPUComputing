@@ -8,20 +8,20 @@
         Si possono avere più \textbf{livelli di sincronizzazione}:
         \begin{itemize}
             \item \textbf{Livello di sistema}: per attendere che un dato task venga completato su host e device; la primitiva
-            \begin{minted}{c}
+            \begin{minted}{cuda}
 cudaError_t cudaDeviceSynchronize(void);
             \end{minted}
             blocca l'applicazione host finché tutte le operazioni CUDA su tutti gli stream non sono completate. Si tratta di una funzione host-side only (una volta usata lato device per gestire il parallelismo dinamico, ma ora deprecata);
             
             \item Non c'è una primitiva esplicita per la sincronizzazione a \textbf{livello di grid}, ma la si può ottenere (da CC 6 in avanti) lanciando un kernel cooperativo
-            \begin{minted}{c}
+            \begin{minted}{cuda}
 cudaLaunchCooperativeKernel(
     (void*)myKernel,
     gridDim, blockDim,
     kernelArgs, /*sharedMemBytes=*/0, /*stream=*/0);
             \end{minted}
             e all'interno del kernel
-            \begin{minted}{c}
+            \begin{minted}{cuda}
 grid_group grid = this_grid();
 // work work work ...
 // waits for _all_ blocks in *this* kernel
@@ -30,13 +30,13 @@ grid.sync();
             Non ci devono essere ulteriori kernel attivi all'interno del device;
             
             \item \textbf{Livello di blocco}: per attendere che tutti i thread in un blocco raggiungano lo stesso punto di esecuzione. La primitiva
-            \begin{minted}{c}
+            \begin{minted}{cuda}
 __syncthreads(void);
             \end{minted}
             impone a tutti i thread nel blocco corrente di attendere fino a quando tutti gli altri thread dello stesso blocco non hanno raggiunto quel particolare punto di esecuzione. Lo scopo principale è garantire la visibilità degli accessi alla memoria (rendere visibile le modifiche), in modo da evitare conflitti e race conditions. Se non tutti i thread all'interno del blocco arrivano alla primitiva si può avere un deadlock;
             
             \item \textbf{Livello di warp}: per attendere che tutti i thread all'interno di un warp raggiungano lo stesso punto di esecuzione. La primitiva
-            \begin{minted}{c}
+            \begin{minted}{cuda}
 __syncwarp(mask);
             \end{minted}
             permette di avere una barriera esplicita per garantire la ri-convergenza del warp per le istruzioni successive. L'argomento \texttt{mask} è composto da una sequenza di 32 bit che permette di definire quali warp partecipano alla sincronizzazione (se omessa, di default tutti, ovvero \texttt{0xFFFFFFFF}).
@@ -44,28 +44,28 @@ __syncwarp(mask);
         
         Sincronizzazione \textbf{tramite stream}: tra stream non-NULL diversi non si ha nessuna dipendenza od ordinamento, mentre lo stream di default (\texttt{0}) ha un comportamento diverso, può essere: 
         \begin{itemize}
-            \item legacy: bloccante rispetto a tutti gli altri stream, un'operazione lanciata nel default stream non può iniziare finché non sono completate tutte le operazioni precedenti in qualsiasi altro stream (e viceversa);
+            \item \texttt{legacy}: bloccante rispetto a tutti gli altri stream, un'operazione lanciata nel default stream non può iniziare finché non sono completate tutte le operazioni precedenti in qualsiasi altro stream (e viceversa);
             
-            \item per-thread: disponibile da CUDA 7, ogni thread host ottiene il suo default stream, diventa non-bloccante rispetto agli altri stream
+            \item \texttt{per-thread}: disponibile da CUDA 7, ogni thread host ottiene il suo default stream, diventa non-bloccante rispetto agli altri stream
         \end{itemize}
-        Il comportamento può essere configurato tramite parametro durante compilazione o direttiva nel codice.
+        Il comportamento può essere configurato tramite parametro \texttt{--default-stream} durante compilazione o direttiva nel codice.
         
         Sincronizzazione \textbf{tramite eventi}: all'interno degli stream si possono creare degli eventi tramite i quali è possibile avere anche sincronizzazione:
         \begin{itemize}
             \item Host-side: la primitiva
-            \begin{minted}{c}
+            \begin{minted}{cuda}
 cudaError_t cudaEventSynchronize(cudaEvent_t event);
             \end{minted}
             permette di attendere lato host finché l'evento specificato non viene completato; esiste una variante non-bloccante:
-            \begin{minted}{c}
+            \begin{minted}{cuda}
 cudaError_t cudaEventQuery(cudaEvent_t event)
             \end{minted}
             che permette di controllare se un evento è stato completato o meno, senza bloccare l'host;
             
             \item Stream-to-stream: per far attendere a uno stream il completamente di un evento su un altro stream. La primitiva:
-            \begin{minted}{c}
+            \begin{minted}{cuda}
 cudaError_t cudaStreamWaitEvent(
-    cudaStream_t stream , cudaEvent_t event);
+    cudaStream_t stream, cudaEvent_t event);
             \end{minted}
             permette di aspettare un evento su un altro stream (anche su altri device).
         \end{itemize}
@@ -103,11 +103,11 @@ cudaError_t cudaStreamWaitEvent(
     
     \begin{solution}
         La sincronizzazione tramite stream ed eventi si può usare anche tra diversi device: un device può controllare il completamento di un evento appartenente a uno stream in esecuzione su un diverso device. La primitiva
-        \begin{minted}{c}
+        \begin{minted}{cuda}
 cudaError_t cudaEventSynchronize(cudaEvent_t event);
         \end{minted}
         permette di attendere l'esecuzione di un evento in maniera bloccante, altrimenti
-        \begin{minted}{c}
+        \begin{minted}{cuda}
 cudaError_t cudaEventQuery(cudaEvent_t event)
         \end{minted}
         permette di controllare se l'evento è completato o meno in maniera non bloccante.
@@ -125,7 +125,7 @@ cudaError_t cudaEventQuery(cudaEvent_t event)
         La divergenza è un fenomeno per cui i thread all'interno di uno stesso warp (gruppo di 32 thread) seguono percorsi di esecuzione diverse a causa di istruzioni di branching (\texttt{if}, \texttt{switch}, \dots). Questo porta a un degrado delle performance in quanto i flussi di esecuzione diversi sono eseguiti in modo seriale dall'hardware (si ha un singolo PC per warp), disattivando i thread "non interessati".
         
         CUDA fornisce primitive per la sincronizzazione esplicita a livello di blocco: 
-        \begin{minted}{c}
+        \begin{minted}{cuda}
 __syncthreads();
         \end{minted}
         Ovvero una barriera che devono raggiungere tutti i thread prima che la computazione possa proseguire.

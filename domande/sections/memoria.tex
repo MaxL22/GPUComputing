@@ -83,11 +83,11 @@
             \item Unified Memory: la primitiva \texttt{cudaMallocManaged()} permette di avere una zona di memoria con indirizzamento unico per host e device, lasciando la gestione della migrazione dei dati a CUDA; semplice da utilizzare, ma può portare a maggiori latenze se non usata correttamente
             
             \item Shared memory: la memoria condivisa può essere allocata dinamicamente tramite una dichiarazione all'interno del kernel di una variabile adimensionale:
-            \begin{minted}{c}
+            \begin{minted}{cuda}
 extern __shared__ float s[];
             \end{minted}
             Va poi passato come terzo argomento tra variabili angolari durante il lancio del kernel la dimensione della memoria condivisa:
-            \begin{minted}{c}
+            \begin{minted}{cuda}
 kernel<<<grid, block, shared_bytes>>>();
             \end{minted}
         \end{itemize}
@@ -181,7 +181,7 @@ kernel<<<grid, block, shared_bytes>>>();
     						}
     						\texttt{\_\_syncthreads()};\\
     					}
-    					\tcp*{Srivere il risultato in memoria globale}
+    					\texttt{// Scrivere il risultato in memoria globale}
     				\end{algorithm}
     			\end{tcolorbox}
     		\end{minipage}

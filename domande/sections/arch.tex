@@ -70,7 +70,7 @@
     \begin{solution}
         In CUDA, un warp è un insieme di 32 thread che vengono eseguiti sullo stesso Streaming Multiprocessor SM; la warp divergence si ha quando thread all'interno di uno stesso warp prendono path di esecuzione differenti (causa istruzioni di controllo condizionale).
         
-        Quando c'è una divergenza, all'interno di un warp, l'hardware deve serializzare i path di esecuzione, eseguendoli uno dopo l'altro, ogni volta disabilitando i thread che non devono entrare in quel ramo di esecuzione. Riduce il parallelismo all'interno del warp, degradando, anche significativamente le prestazioni.
+        Quando c'è una divergenza, all'interno di un warp, l'hardware deve serializzare i path di esecuzione, eseguendoli uno dopo l'altro, ogni volta disabilitando i thread che non devono entrare in quel ramo di esecuzione. Riduce il parallelismo all'interno del warp, degradando, anche significativamente, le prestazioni.
         
         Per la parallel reduction, l'approccio "naive" consiste nell'imitare la somma strided ricorsiva: al passaggio $i$ si sommano elementi a distanza $2^i$; in parallelo, questo attiverebbe 1 thread ogni $2^{i+1}$, causando divergenza crescente (a ogni step si usano la metà dei thread precedenti, divisi sullo stesso numero di warp).
         
@@ -93,7 +93,7 @@
         Quando tutti i thread eseguono la stessa istruzione, senza divergenze, il modello SIMT si comporta ugualmente a quello SIMD: si ha un'unica istruzione su dati diversi in parallelo.
         
         Banalmente, qualsiasi codice senza possibilità di divergenze si comporta come SIMD
-        \begin{minted}{c}
+        \begin{minted}{cuda}
  __global__ void vectorAdd(const float* A, const float* B, 
 float* C, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -153,13 +153,13 @@ float* C, int N) {
     	Il loop unrolling è una tecnica usata per ottimizzare i cicli: questi vengono "srotolati" in modo da ridurre l'overhead dovuto alle operazioni di controllo, ridurre il branching e i salti condizionali, aumentando così il livello di parallelismo. Si copia il corpo del loop un numero $n$ di volte, chiamato unroll factor. Lo si può fare manualmente, in alternativa, CUDA fornisce direttive di compilazione.
     	
     	Esempio di loop unrolling: 
-    	\begin{minted}{c}
+    	\begin{minted}{cuda}
 for (int i = 0; i < 4; i++){
     A[base] += B[base + i];
 }
     	\end{minted}
     	Può diventare:
-    	\begin{minted}{c}
+    	\begin{minted}{cuda}
 A[base] += B[base + 0];
 A[base] += B[base + 1];
 A[base] += B[base + 2];

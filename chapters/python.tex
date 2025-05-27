@@ -64,7 +64,7 @@ Si possono invece definire kernel sulla GPU con \texttt{@cuda.jit}. Si possono l
 
 Mentre le posizioni assolute si possono ottenere con: 
 \begin{itemize}
-	\item \texttt{numba.cuda.grid(ndim)}: torna la posizione assoluta del thread all'interno dell'intera griglia di blocchi; \texttt{ndim} deve corrispondere al numero di dimensioni dichiarate per l'istanza del kernel, se i\texttt{=1} torna un solo interno, altrimenti una tupla contenente quel numero di interi
+	\item \texttt{numba.cuda.grid(ndim)}: torna la posizione assoluta del thread all'interno dell'intera griglia di blocchi; \texttt{ndim} deve corrispondere al numero di dimensioni dichiarate per l'istanza del kernel, se i\texttt{=1} torna un solo intero, altrimenti una tupla contenente quel numero di interi
 	
 	\item \texttt{numba.cuda.gridsize(ndim)}: torna la dimensione assoluta ("forma") in thread dell'intera griglia di blocchi
 \end{itemize}

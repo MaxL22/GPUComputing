@@ -9,7 +9,7 @@ $$ b[k] = \sum_{i=0}^{k} a[i] \quad \forall k \in 0, \dots n-1 $$
 Questo pattern viene utilizzato come "blocco" all'interno di diverse applicazioni, come alcuni algoritmi di sorting, operazioni su alberi, distribuzioni di probabilità cumulative, \dots
 
 La versione sequenziale è molto semplice:
-\begin{minted}{c}
+\begin{minted}{cuda}
 void prefix_sum(float *a, float *b, int n) {
     b[0] = a[0];
     for (int i = 1; i < n; i++)
@@ -45,13 +45,13 @@ Horn usa un approccio iterativo in $d = \lceil \log_2 n \rceil$ passi. A ogni pa
 A livello pratico:
 \begin{itemize}
     \item Vengono caricati i dati in memoria shared
-    \begin{minted}{c}
+    \begin{minted}{cuda}
 smem[tid] = input[tid];
 __syncthreads();
     \end{minted}
     
     \item Loop per effettuare l'operazione: ogni thread somma il valore della cella di smem relativa con quella a distanza determinata dall'offset
-    \begin{minted}{c}
+    \begin{minted}{cuda}
 for (int d = 1; d < BLOCK_SIZE; d *= 2) {
     if (tid >= d)
         smem[tid] += smem[tid - d];

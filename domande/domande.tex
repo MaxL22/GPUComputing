@@ -7,6 +7,7 @@
 \definecolor{g}{rgb}{0,0.5,0.1}
 \usepackage{minted}
 \setminted[c]{bgcolor=bg}
+\setminted[cuda]{bgcolor=bg}
 \setminted[python]{linenos, bgcolor=bg}
 \setminted[java]{bgcolor=bg}
 \usepackage[autostyle, english = american]{csquotes}
@@ -24,21 +25,6 @@
 \renewcommand{\contentsname}{Sezioni}
 \newcommand{\N}{\mathbb{N}}
 \newcommand{\tc}{\, \text{ t.c. } \,}
-
-% TODO: Domande trovate (fuori da Notion)
-
-% Pattern
-%- NSY: mostrare il pseudo codice dell'algoritmo di boruvka
-%- NSY: Fare uno schema di una BFS parallela
-
-% Domande in dubbio:
-% - schema di utilizzo di più gpu, ad esempio per la somma di due vettori
-%		Lo ha spiegato?
-% - Sincronizzazione a due livelli di CUDA.
-% 		Cosa vuol dire?
-% - Uso degli stream per il prodotto di matrici diagonali a blocchi.
-%		Non penso lo abbia spiegato? Ho un fever dream a riguardo, ma non trovo nulla al momento
-%       Nel lab1 c'è qualcosa, ma senza stream
 
 \begin{document}
     
