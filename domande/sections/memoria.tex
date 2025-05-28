@@ -105,10 +105,12 @@ kernel<<<grid, block, shared_bytes>>>();
         Semplifica lo sviluppo CUDA, ma può portare a un maggiore overhead dovuto alla migrazione (gestita a livello di pagina) rispetto alla gestione della memoria con trasferimenti espliciti.
     \end{solution}
     
-    \question Significato e utilità di pattern di accesso alla memoria globale.
+    \question Significato e utilità di pattern di accesso alla memoria globale. Distinzioni tra lettura e scrittura.
     
     \begin{solution}
-        I pattern di accesso alla memoria globale sono le strutture riguardanti "come" viene effettuato l'accesso alla memoria da parte dei thread.
+        La global memory è una memoria off-chip (DRAM, divisa dal chip dell'SM su cui il thread è in esecuzione), quindi ad alta latenza ($400\sim 800$ cicli di clock), con scope e lifetime globale. 
+        
+        I pattern di accesso alla memoria globale sono le strutture riguardanti "come" viene effettuato l'accesso alla memoria da parte dei thread. La memoria ha, infatti, latenza elevata, ma throughput ampio quando gli accessi sono coalescenti.
         
         Gli accessi alla memoria del device possono avvenire in transazioni da 32, 64 o 128 byte. Spesso le applicazioni sono limitate dal throughput effettivo della memoria, quindi per rendere efficienti i trasferimenti si vuole minimizzare il numero di transazioni. 
         
@@ -125,7 +127,7 @@ kernel<<<grid, block, shared_bytes>>>();
         
         Può essere importante strutturare i dati in modo da avere accessi coalescenti (array of structures vs structures of array).
         
-        Le operazioni di scrittura non usano la cache L1, le \texttt{store} vengono cachate solo in L2, prima di essere inviati alla device memory in 1,2 o 4 segmenti da 32 byte.
+        Le operazioni di scrittura non usano la cache L1, le \texttt{store} vengono cachate solo in L2, prima di essere inviati alla device memory in 1,2 o 4 segmenti da 32 byte. Accessi allineati e coalescenti sono ugualmente importanti per lettura e scrittura. Inoltre, per la sola lettura esistono zone di memoria dedicate (constant e texture memory); la lettura possiede una gerarchia di memorie più complessa.
     \end{solution}
     
     \question Bank e bank conflict.
@@ -170,7 +172,7 @@ kernel<<<grid, block, shared_bytes>>>();
     					\SetArgSty{relax}
     					\texttt{\_\_shared\_\_ As[WIDTH][WIDTH]}; \\
     					\texttt{\_\_shared\_\_ Bs[WIDTH][WIDTH]}; \\
-    					\texttt{nblocks =} numero di block nelle sotto-matrici da caricare; \\
+    					\texttt{nblocks =} numero di block contenuti nelle sotto-matrici da caricare; \\
     					\For{$i \in$ \texttt{nblocks}}{
     						\texttt{As[tidy][tidx] = A[tidx\_abs + $i$ * WIDTH][tidy\_abs]}; \\
     						\texttt{Bs[tidy][tidx] = B[tidx\_abs][tidy\_abs + $i$ * WIDTH]}; \\
@@ -186,6 +188,17 @@ kernel<<<grid, block, shared_bytes>>>();
     			\end{tcolorbox}
     		\end{minipage}
     	\end{center}
+        
+        Dove: 
+        \begin{itemize}
+            \item \texttt{WIDTH} è la dimensione del blocco di dati da caricare
+            
+            \item \texttt{tidx} e \texttt{tidy} sono le coordinate del thread all'interno del blocco
+        
+            \item \texttt{tidx\_abs} e \texttt{tidy\_abs} sono le coordinate del thread rispetto alla grid
+            
+            \item \texttt{nblocks} rappresenta il ceil della larghezza (o altezza) della matrice fratto la larghezza (o altezza) del block
+        \end{itemize}
     \end{solution}
     
     \question Constant memory e suo utilizzo.
@@ -206,5 +219,69 @@ cudaError_t cudaMemcpyFromSymbol(const void* dst,
     const void* symbol, size_t count);
         \end{minted}
     \end{solution}
+    
+    \question Come viene mappata logicamente e fisicamente la shared Memory.
+    
+    \begin{solution}
+        La shared memory è una memoria programmabile a bassa latenza, con scope di blocco (visibile da tutti thread all'interno di uno stesso blocco) e lifetime pari a quello del kernel. La si può dichiarare tramite il qualificatore \texttt{\_\_shared\_\_}, sia staticamente che dinamicamente. Serve come comunicazione a bassa latenza tra thread dello stesso blocco. La dimensione della shared memory è limitata e il numero di blocchi concorrenti è determinato anche dalla smem disponibile.
+        
+        Fisicamente, si tratta di una memoria on-chip, quindi posizionato sullo stesso chip dello SM, organizzata linearmente in moduli chiamati bank (tipicamente 32). Gli accessi alla shared memory (sia load che store) vengono emessi per warp e la banda massima si ha quando tutti gli warp accedono a bank diversi (word consecutive). Se due thread all'interno dello stesso warp tentano di accedere allo stesso bank si ha un bank conflict, che richiede la serializzazione degli accessi e causa un degrado delle prestazioni.
+    \end{solution}
+    
+    \question Vantaggi della Unified Memory ed esempio di utilizzo.
+    
+    \begin{solution}
+        La memoria unificata (unified memory), introdotta da CUDA 6.0, semplifica la gestione della memoria creando uno spazio di indirizzamento unico tra CPU e GPU. Tramite un unico puntatore si può accedere sia alla memoria host che device. 
+        
+        Il trasferimento di dati avviene in maniera trasparente al programmatore, gestito dal sistema CUDA. Tra i vantaggi possiamo notare:
+        \begin{itemize}
+            \item semplicità di programmazione, si tratta di un modello più semplice, non richiede gestione manuale della memoria e porta a codice più comprensibile
+            
+            \item coerenza automatica della memoria, CUDA si occupa di mantenere automaticamente la coerenza tra host e device, a volte a scapito delle performance
+            
+            \item over-subscription della memoria, si può allocare più memoria di quanta sia fisicamente disponibile sulla GPU, le pagine verranno spostate in automatico quando necessario, permettendo di usare data set più grandi5
+        \end{itemize} 
+        
+        Esempio di utilizzo:
+        \begin{minted}{cuda}
+// Dichiarazione e popolamento dei dati
+float *A, *B;
+cudaMallocManaged(&A, size);
+cudaMallocManaged(&B, size);
+for (int i = 0; i < N; ++i) {
+    A[i] = float(i);
+}
+
+// Esecuzione del kernel
+kernel<<<grid, block>>>(A, B);
+cudaDeviceSynchronize();
+
+// Uso dei risultati da parte della CPU
+printf("%f", B[0]); // Esempio banale
+
+// Rilascio delle risorse
+cudaFree(A);
+cudaFree(B);
+        \end{minted}
+    \end{solution}
+    
+    \question Come si usa la SMEM?
+    
+    \begin{solution}
+        La shared memory è una memoria a bassa latenza con lifetime del kernel e scope a livello di blocco. La si può dichiarare tramite il qualificatore \texttt{\_\_shared\_\_}:
+        \begin{minted}{cuda}
+__shared__ float s[size];
+        \end{minted}
+        
+        Se la dimensione della memoria condivisa non è nota a compile time ma deve essere dinamica, si usa la keyword \texttt{extern} e la dimensione va indicata come terzo parametro tra parentesi angolari quando viene chiamato il kernel. Dichiarazione:
+        \begin{minted}{cuda}
+extern __shared__ float s[];
+        \end{minted}
+        Dimensione:
+        \begin{minted}{cuda}
+kernel<<<grid, block, sharedMemorySize>>>();
+        \end{minted}
+    \end{solution}
+    
     
 \end{questions}

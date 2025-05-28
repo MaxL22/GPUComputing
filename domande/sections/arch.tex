@@ -34,7 +34,7 @@
         Si possono anche avere stream con priorità, \texttt{cudaStreamCreateWithPriority()}: uno stream con priorità più alta può prelazionare lavoro in esecuzione con priorità più bassa.
     \end{solution}
     
-    \question Mostrare l'architettura di uno SM.
+    \question Mostrare l'architettura di uno SM di cui è composta la GPU. Quali sono le unità hardware?
     
     \begin{solution}
         Le GPU sono costituite da array di Streaming Multiprocessor SM, ognuno dei quali è pensato per supportare l'esecuzione concorrente di centinaia di thread. Si divide in gruppi di 32 thread chiamati "warp".
@@ -62,6 +62,10 @@
             \item Instruction Cache: per ridurre la latenza dovuta al fetch di istruzioni
             
             \item Texture \& constant cache: cache separate per accessi read-only in maniera non sequenziale
+            
+            \item Barrier \& Synchronization Unit: implementano primitive di sincronizzazione a livello di blocco
+            
+            \item Interfacce verso L2 e rete di connessione tra SM
         \end{itemize}
     \end{solution}
     
@@ -105,7 +109,7 @@ float* C, int N) {
         In questo modo tutti i thread all'interno di un warp eseguono la stessa istruzione.
     \end{solution}
     
-    \question Ciclo di vita dei thread e organizzazione gerarchica.
+    \question Ciclo di vita dei thread e organizzazione gerarchica. Come conviene organizzarli per lavorare su matrici?
     
     \begin{solution}
     	I thread sono l'unità di esecuzione fondamentale in CUDA, il codice viene scritto in CUDA C per l'esecuzione sequenziale la quale viene estesa a migliaia di thread. Ogni thread, durante la sua vita, può passare per più stati di esecuzione, legati anche al modello di esecuzione SIMT e allo scheduling:
@@ -135,6 +139,8 @@ float* C, int N) {
     		
     		\item i thread fisicamente sono raggruppati in gruppi di 32, detti warp; questi dovrebbero, tra loro, avere modello di esecuzione SIMD, pena un degrado delle prestazioni 
     	\end{itemize}
+        
+        I thread possono essere organizzati su blocchi e griglie a 1, 2 o 3 dimensioni. Per lavorare su matrici lo schema più intuitivo è quello di usare blocchi e grid bidimensionali in modo da coprire tutto l'input (grid) dividendolo in sotto-matrici (blocchi).
     \end{solution}
     
     \question Cosa sono i warp in SIMT e qual è la loro utilità.
@@ -251,6 +257,98 @@ if (threadIdx.x < 32) {
         Con il termine "compute capability" si intende la versione dell'architettura CUDA supportata da una GPU Nvidia, espressa sotto forma di numero.
         
         Permette di stabilire le feature e funzionalità hardware disponibili. Viene usato in fase di compilazione per stabilire l'architettura per cui compilare.
+    \end{solution}
+    
+    \question Uso degli stream per il prodotto di matrici diagonali a blocchi MQDB.
+    
+    \begin{solution}
+    	Gli stream sono una sequenza di operazioni CUDA incapsulate in una coda FIFO, eseguite dalla GPU in maniera asincrona rispetto all'host, sempre rispettando l'ordine di esecuzione fornito. Una MQDB è una matrice che ha valori non nulli solo in blocchi di dimensioni $d_1, \dots, d_n$ attorno alla diagonale.
+    	
+    	L'uso degli stream permette di dividere il carico di lavoro e i trasferimenti di memoria, permettendo un parallelismo tra trasferimenti ed esecuzione dei kernel (DMA permettendo). Sapendo che il prodotto di due matrici MQDB è anch'esso una matrice con le stesse proprietà, lo schema ovvio per l'utilizzo degli stream è quello di utilizzare stream diversi per ogni blocco di dati, permettendo il parallelismo tra trasferimenti e kernel.
+    	
+    	Codice (forse funzionante):
+    	\begin{minted}{cuda}
+__global__ void streamMQDB(int *A, int *B, int *R) {
+    int tid = threadIdx.x + threadIdx.y * blockDim.x;
+    __shared__ int As[BS][BS];
+    __shared__ int Bs[BS][BS];
+	
+    As[threadIdx.y][threadIdx.x] = A[tid];
+    Bs[threadIdx.y][threadIdx.x] = B[tid];
+    __syncthreads();
+	
+    float sum = 0.0f;
+    for (int k = 0; k < BS; ++k) {
+        sum += As[k][threadIdx.y] * Bs[threadIdx.x][k];
+    }
+    R[tid] = sum;
+}
+    	\end{minted}
+    \end{solution}
+    
+    \question Come vengono schedulati i blocchi sugli SM?
+    
+    \begin{solution}
+        Quando viene invocato un kernel, si ha una coda di blocks che aspettano di andare in esecuzione, il block scheduler assegna ogni blocco al primo SM che abbia risorse a sufficienza libere. Vengono assegnati dinamicamente agli SM in base alla disponibilità. Un blocco di thread viene assegnato a un solo SM e vi rimane fino al termine della sua esecuzione, molteplici blocchi possono risiedere su un singolo SM.
+        
+        Ogni SM ha un limite di risorse (in termini di registri, shared memory, numero di thread, \dots) e possiede uno o più warp scheduler che si occupano di decidere, ad ogni ciclo di clock, quali warp, tra quelli attivi, mandare in esecuzione; un warp attivo può essere in uno di tre stati: 
+        \begin{itemize}
+            \item Candidato: pronto per essere mandato in esecuzione
+            
+            \item Selezionato: in esecuzione
+            
+            \item Bloccato: in attesa di qualcosa, ad esempio un trasferimento di memoria
+        \end{itemize}
+        
+        Il warp scheduler cambia dinamicamente il warp da mandare in esecuzione in modo da mantenere alta l'occupancy (rapporto tra warp attivi e warp teoricamente sostenibili) e nascondere la latenza dovuta ad alcuni tipi di operazioni.
+    \end{solution}
+    
+    \question Che livello di concorrenza permettono di ottenere i CUDA streams.
+    
+    \begin{solution}
+        I CUDA Streams sono sequenze di operazioni eseguite sulla GPU in maniera asincrona rispetto all'host e (generalmente) indipendenti l'uno dall'altro (stream non-NULL non sono bloccanti a vicenda).
+        
+        L'esecuzione di un kernel può cominciare alla fine dei trasferimenti di memoria necessari, ma con grandi quantità di dati sarebbe preferibile caricare una porzione dei dati e cominciare l'esecuzione, lasciando al DMA il caricamento dei dati restanti, parallelamente all'esecuzione del kernel. Gli stream permettono di fare questo, abilitano la concorrenza tra trasferimenti di memoria e kernel.
+        
+        Permettono la sovrapposizione di trasferimento dati ed esecuzione del kernel.
+    \end{solution}
+    
+    \question Mostrare un uso pratico degli stream CUDA.
+    
+    \begin{solution}
+        Gli stream vengono utilizzati per sovrapporre trasferimenti di memoria con computazioni da parte della GPU. Uno schema di utilizzo può essere: 
+        \begin{minted}{cuda}
+// Si suppongono già fatte le allocazioni di memoria
+
+//Creazione degli stream
+cudaStream_t stream1, stream2;
+cudaStreamCreate(&stream1);
+cudaStreamCreate(&stream2);
+
+// Trasferimenti e lancio kernel separati
+cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, stream1);
+cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, stream2);
+kernel<<<grid, block, smem, stream1>>>();
+kernel<<<grid, block, smem, stream2>>>();
+cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, stream1);
+cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, stream1);
+
+// Attendere che gli stream termina
+cudaStreamSynchronize(stream1);
+cudaStreamSynchronize(stream2);
+
+// Rilascio delle risorse
+cudaStreamDestroy(stream1);
+cudaStreamDestroy(stream2);
+        \end{minted}
+    \end{solution}
+    
+    \question Come può la divergenza causare deadlock?
+    
+    \begin{solution}
+        La divergenza accade quando thread all'interno di uno stesso warp seguono flussi di esecuzione separati. Per risolvere il problema esistono barriere di sincronizzazione a livello di warp come \texttt{\_\_syncwarp(mask)}, queste lasciano i thread che la raggiungono in attesa fino a quando tutti i thread di uno stesso warp non arrivano a quel punto nell'esecuzione.
+        
+        Le barriere di sincronizzazione possono causare problemi quando condizionate: se solo una porzione dei thread all'interno di un warp raggiunge il \texttt{\_\_syncwarp()} "nascosto" dietro un \texttt{if} in cui gli altri non entreranno mai, questi rimarranno in un'attesa infinita: deadlock.
     \end{solution}
     
 \end{questions}

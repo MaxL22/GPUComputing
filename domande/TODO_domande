@@ -11,40 +11,20 @@ Domande in dubbio:
     Ok questa la so, ma ce ne sono altri?
 - Sincronizzazione a due livelli di CUDA.
     Cosa vuol dire?
+- Mostrare il grafico del parallelismo dinamico nel caso di prodotto matriciale con matrici diagonali a blocco MQDB
+    What
+- Mostrare il grafico del stream CUDA nel caso di blocco MQDB
+    What
 
 
-
-
-- Uso degli stream per il prodotto di matrici diagonali a blocchi.
-
-- pseudocodice del trasferimento in memoria shared per il prodotto matriciale 
-- uso degli stream per il prodotto di matrici diagonali a blocchi
-
-- Come vengono schedulati i blocchi sugli SM 
 
 - Somma di matrici utilizzando numba
 
-- Come viene mappata logicamente e fisicamente la shared Memory
 - Codice kernel del prodotto(?) di matrici triangolari superiori (credo fosse il prodotto)
 
-- architettura SMEM
-- modalità di accesso a GMEM con distinzione lettura/scrittura
 - commentare un kernel CUDA python semplice
-- che livello di concorrenza permettono di ottenere i CUDA streams
-- vantaggi unified Memory ed esempio di utilizzo
 
-- Quali unità HW troviamo all'interno di uno streaming multiprocessor (SM) di cui è composta la GPU?
 - Dare il kernel (anche in pseudocodice) della somma matriciale in Numba
 
     @cuda.jit
     def matsum (A, B) :
-
-- Illustrare il concetto di parallel reduction.
-- Mostrare un uso pratico degli stream CUDA.
-
-- organizzazione dei thread in cuda, come conviene organizzarli per lavorare su matrici
-- come può la divergenza causare deadlock
-- come si usa la SMEM
-
-- Mostrare il grafico del parallelismo dinamico nel caso di prodotto matriciale con matrici diagonali a blocco MQDB
-- Mostrare il grafico del stream CUDA nel caso di blocco MQDB
