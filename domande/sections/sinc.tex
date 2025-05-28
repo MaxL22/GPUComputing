@@ -16,7 +16,7 @@ cudaError_t cudaDeviceSynchronize(void);
             \item Non c'è una primitiva esplicita per la sincronizzazione a \textbf{livello di grid}, ma la si può ottenere (da CC 6 in avanti) lanciando un kernel cooperativo
             \begin{minted}{cuda}
 cudaLaunchCooperativeKernel(
-    (void*)myKernel,
+    (void*) myKernel,
     gridDim, blockDim,
     kernelArgs, /*sharedMemBytes=*/0, /*stream=*/0);
             \end{minted}
@@ -58,7 +58,7 @@ cudaError_t cudaEventSynchronize(cudaEvent_t event);
             \end{minted}
             permette di attendere lato host finché l'evento specificato non viene completato; esiste una variante non-bloccante:
             \begin{minted}{cuda}
-cudaError_t cudaEventQuery(cudaEvent_t event)
+cudaError_t cudaEventQuery(cudaEvent_t event);
             \end{minted}
             che permette di controllare se un evento è stato completato o meno, senza bloccare l'host;
             
@@ -108,7 +108,7 @@ cudaError_t cudaEventSynchronize(cudaEvent_t event);
         \end{minted}
         permette di attendere l'esecuzione di un evento in maniera bloccante, altrimenti
         \begin{minted}{cuda}
-cudaError_t cudaEventQuery(cudaEvent_t event)
+cudaError_t cudaEventQuery(cudaEvent_t event);
         \end{minted}
         permette di controllare se l'evento è completato o meno in maniera non bloccante.
         

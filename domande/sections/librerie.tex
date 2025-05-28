@@ -58,8 +58,8 @@ curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT);
 curandSetPseudoRandomGeneratorSeed(generator, seed_value);
 
 // Allocazione della memoria
-cudaMalloc(&d_raw,    N * sizeof(unsigned int));
-cudaMalloc(&d_dice,   N * sizeof(unsigned char));
+cudaMalloc(&d_raw, N * sizeof(unsigned int));
+cudaMalloc(&d_dice, N * sizeof(unsigned char));
 
 // Generazione dei valori
 curandGenerate(generator, d_raw, N);
@@ -69,7 +69,7 @@ kernel_normalize_values<<<blocks, threads>>>(d_raw, d_dice, N);
 
 // Trasferimento dei valori all'host
 cudaMallocHost(&h_dice, N * sizeof(unsigned char));
-cudaMemcpy(h_dice, d_dice, N * sizeof(unsigned char),
+cudaMemcpy(h_dice, d_dice, N * sizeof(unsigned char);
 cudaMemcpyDeviceToHost);
 
 // Clean up

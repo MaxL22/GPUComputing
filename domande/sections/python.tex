@@ -1,0 +1,49 @@
+% !TeX spellcheck = it_IT
+\section{Python}
+
+\begin{questions}
+    \question Commentare un kernel CUDA python semplice.
+    
+    \begin{solution}
+        Un semplice kernel potrebbe essere:
+        \begin{minted}{python}
+@cuda.jit
+def increment_kernel(data):
+    # Calcola la posizione assoluta
+    #   del thread nella griglia
+    idx = cuda.grid(1) # L'1 indica l'indice su 1 dimensione
+    # Controlla il bound dell'array
+    if idx < data.size:
+        data[idx] += 1 # Incrementa il valore
+        \end{minted}
+        Il lancio del kernel potrebbe essere:
+        \begin{minted}{python}
+from numba import cuda
+import numpy as np
+
+# Move data to the device
+device_array = cuda.to_device(host_array)
+# Call the kernel
+increment_kernel[grid, block](device_array)
+# Move the results back
+result_array = device_array.copy_to_host()
+        \end{minted}
+        presupponendo che i parametri necessari siano già impostati.
+    \end{solution}
+    
+    \question Dare il kernel della somma matriciale in Numba.
+    
+    \begin{solution}
+        Per effettuare la somma tra matrici:
+        \begin{minted}{python}
+@cuda.jit
+def matsum (A, B):
+    # Indice 2D della griglia
+    row, col = cuda.grid(2)
+    # Controllo dei bound
+    if row < A.shape[0] and col < A.shape[1]:
+        A[row, col] = A[row, col] + B[row, col]
+        \end{minted}
+        I parametri sono solamente le due matrici, il risultato viene posto nella prima.
+    \end{solution}
+\end{questions}

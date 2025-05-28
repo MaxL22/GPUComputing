@@ -1,0 +1,329 @@
+%!TeX spellcheck = it_IT
+\section{Codice}
+
+\begin{questions}
+    \question Come usare la shared memory per le convoluzioni.
+    
+    \begin{solution}
+        Un possibile schema per la convoluzione usando la shared memory è quello del tiling: a ogni blocco della grid viene affidato un "tile" (sotto-blocco) dell'immagine in input, ogni thread nel blocco si occupa di un prodotto della convoluzione. 
+        
+        In shared memory vanno caricati tutti i possibili dati a cui il blocco deve fare accesso, ovvero la porzione dell'immagine di cui si occupa, assieme all'area data dal raggio della maschera di convoluzione (un "alone" attorno al sotto-blocco stesso).
+        
+        Rimane il problema di come caricare i blocchi in shared memory: i dati sono più del blocco stesso, sarebbe ottimale dividere il più equamente possibile il carico di lavoro. 
+        
+        Un'idea può essere dare un ordine ai thread e "ripetere" il thread block sopra la sotto-matrice formata da tutti i dati da caricare. Tiling della zona da caricare in smem.
+        
+        L'uso della shared memory permette di limitare gli accessi alla memoria globale, incrementando la velocità degli accessi successivi, ma sono da tenere in conto possibili bank conflict (la shared memory è divisa in bank, se due o più thread vogliono accedere alla stessa bank vanno serviti serialmente) e la quantità di memoria shared utilizzata influisce sul numero di blocchi attivi concorrentemente su un singolo SM.
+        
+        Pseudocodice:
+        \begin{center}
+            \begin{minipage}{.9\textwidth}
+                \begin{tcolorbox}[
+                    colback=white,
+                    sharp corners,
+                    boxrule=.3mm,
+                    left=20pt,
+                    top=0pt,
+                    bottom=0pt,
+                    colbacktitle=white,
+                    coltitle=black
+                    ]
+                    \LinesNumbered
+                    \begin{algorithm}[H]
+                        \SetAlgoNoEnd
+                        \SetKwSty{texttt}
+                        \SetArgSty{relax}
+                        \texttt{nblocks =} numero di blocchi per il tiling;\\
+                        \For{$i, j \in $ \texttt{numblocks}}{
+                            \texttt{// Calcola indici} \\
+                            \texttt{// Carica nella smem} \\
+                        }
+                        \texttt{\_\_syncthreads()}; \\
+                        \texttt{sum = 0}; \\
+                        \For{$i,j \in $ \texttt{MASK\_SIZE}}{
+                            \texttt{sum} $\leftarrow$ \texttt{sum + smemValue * maskValue};\\
+                        }
+                        \texttt{// Scrivere l'output}
+                    \end{algorithm}
+                \end{tcolorbox}
+            \end{minipage}
+        \end{center}
+        
+        Codice:
+        \begin{minted}{cuda}
+__global__ void conv2D(Matrix A, Matrix B, Matrix M) {
+    // Indici per colonna e riga della matrice A
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    // Allocazione della smem
+    __shared__ float smem[TILE_SIZE][TILE_SIZE];
+    
+    // Caricare i dati nella smem
+    for (int row = 0; row <= TILE_SIZE / blockDim.y; row++) {
+        for (int col = 0; col <= TILE_SIZE / blockDim.x; col++) {
+            // Indici per i dati originali
+            int d_row = y + blockDim.y * row - RADIUS;
+            int d_col = x + blockDim.x * col - RADIUS;
+            // Indici per la smem
+            int s_row = threadIdx.y + blockDim.y * row;
+            int s_col = threadIdx.x + blockDim.x * col;
+            
+            // Controlla che il range sia valido, per smem e dati
+            if (s_row < TILE_SIZE && s_col < TILE_SIZE) {
+                if (d_row >= 0 && d_row < A.height 
+                            && d_col >= 0 && d_col < A.width) {
+                    smem[s_row][s_col] =
+                            A.elements[d_row * A.width + d_col];
+                } else {
+                    smem[s_row][s_col] = 0.0f;
+                }
+            }
+        }
+    }
+    __syncthreads();
+    
+    // Convoluzione
+    float sum = 0.0f;
+    for (int i = 0; i < MASK_SIZE; i++) {
+        for (int j = 0; j < MASK_SIZE; j++) {
+            int r = threadIdx.y + i;
+            int c = threadIdx.x + j;
+            if (r >= 0 && r < TILE_SIZE && c >= 0 && c < TILE_SIZE) {
+                sum += smem[r][c] * M.elements[i * MASK_SIZE + j];
+            }
+        }
+    }
+    
+    // Scrive l'output
+    if (y < A.height && x < A.width) {
+        B.elements[y * B.width + x] = sum;
+    }
+}
+        \end{minted}
+    \end{solution}
+    
+    \question Pseudocodice del trasferimento in memoria shared per il prodotto matriciale.
+    
+    \begin{solution}
+        L'idea dietro l'uso della smem è: vogliamo suddividere in tile le zone di memoria della matrici di cui fare il prodotto (divise in \texttt{nblocks} tile della dimensione del block), in modo da poterle caricare con una suddivisione del lavoro più equa possibile. Per il numero di tile \texttt{nblocks} quindi si ripete il processo di 
+        \begin{itemize}
+            \item caricare i valori delle due matrici in smem
+            
+            \item calcolare la somma parziale data dai valori parziali caricati, per ogni cella della matrice prodotto
+        \end{itemize}
+        
+        Una volta terminato, scrivere i valori in memoria globale.
+        
+        Pseudocodice:
+        \begin{center}
+            \begin{minipage}{.9\textwidth}
+                \begin{tcolorbox}[
+                    colback=white,
+                    sharp corners,
+                    boxrule=.3mm,
+                    left=20pt,
+                    top=0pt,
+                    bottom=0pt,
+                    colbacktitle=white,
+                    coltitle=black
+                    ]
+                    \LinesNumbered
+                    \begin{algorithm}[H]
+                        \SetAlgoNoEnd
+                        \SetKwSty{texttt}
+                        \SetArgSty{relax}
+                        \texttt{\_\_shared\_\_ As[WIDTH][WIDTH]}; \\
+                        \texttt{\_\_shared\_\_ Bs[WIDTH][WIDTH]}; \\
+                        \texttt{nblocks =} numero di block contenuti nelle sotto-matrici da caricare; \\
+                        \For{$i \in$ \texttt{nblocks}}{
+                            \texttt{As[tidy][tidx] = A[tidx\_abs + $i$ * WIDTH][tidy\_abs]}; \\
+                            \texttt{Bs[tidy][tidx] = B[tidx\_abs][tidy\_abs + $i$ * WIDTH]}; \\
+                            \texttt{\_\_syncthreads()}; \\
+                            
+                            \For{$j \in$ \texttt{WIDTH}}{
+                                \texttt{partial\_sum += As[tidy][j] * Bs[j][tidx]}; \\
+                            }
+                            \texttt{\_\_syncthreads()};\\
+                        }
+                        \texttt{// Scrivere il risultato in memoria globale}
+                    \end{algorithm}
+                \end{tcolorbox}
+            \end{minipage}
+        \end{center}
+        
+        Dove: 
+        \begin{itemize}
+            \item \texttt{WIDTH} è la dimensione del blocco di dati da caricare
+            
+            \item \texttt{tidx} e \texttt{tidy} sono le coordinate del thread all'interno del blocco
+            
+            \item \texttt{tidx\_abs} e \texttt{tidy\_abs} sono le coordinate del thread rispetto alla grid
+            
+            \item \texttt{nblocks} rappresenta il ceil della larghezza (o altezza) della matrice fratto la larghezza (o altezza) del block
+        \end{itemize}
+    \end{solution}
+    
+    \question Codice per un kernel che svolge il prodotto di matrici triangolari superiori.
+    
+    \begin{solution}
+        Senza ottimizzazioni particolari, un kernel potrebbe essere:
+        \begin{minted}{cuda}
+// A e B matrici di input, C output, N dimensione
+__global__ void upperTriangularMatMul(float *A, float *B, 
+                float *C, int N) {
+    // Indici assoluti della cella
+    int row = threadIdx.y + blockIdx.y * blockDim.y;
+    int col = threadIdx.x + blockIdx.x * blockDim.x;
+    // Bound check
+    if (row < N && col < N) {
+        float sum = 0.0f;
+        if (row <= col) {
+            // Somma solo per k = row..col, dato che upper-triangular
+            for (int k = row; k <= col; ++k) {
+                sum += A[row * N + k] * B[k * N + col];
+            }
+        }
+        // Scrivere in memoria il risultato
+        C[row * N + col] = sum;
+    }
+}
+        \end{minted} 
+    \end{solution}
+    
+    \question Mostrare un uso pratico degli stream CUDA.
+    
+    \begin{solution}
+        Gli stream vengono utilizzati per sovrapporre trasferimenti di memoria con computazioni da parte della GPU. Uno schema di utilizzo può essere: 
+        \begin{minted}{cuda}
+// Si suppongono già fatte le allocazioni di memoria
+
+//Creazione degli stream
+cudaStream_t stream1, stream2;
+cudaStreamCreate(&stream1);
+cudaStreamCreate(&stream2);
+
+// Trasferimenti e lancio kernel separati
+cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, stream1);
+cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, stream2);
+kernel<<<grid, block, smem, stream1>>>();
+kernel<<<grid, block, smem, stream2>>>();
+cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, stream1);
+cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, stream1);
+
+// Attendere che gli stream termina
+cudaStreamSynchronize(stream1);
+cudaStreamSynchronize(stream2);
+
+// Rilascio delle risorse
+cudaStreamDestroy(stream1);
+cudaStreamDestroy(stream2);
+        \end{minted}
+    \end{solution}
+    
+    \question Uso degli stream per il prodotto di matrici diagonali a blocchi MQDB.
+    
+    \begin{solution}
+        Gli stream sono una sequenza di operazioni CUDA incapsulate in una coda FIFO, eseguite dalla GPU in maniera asincrona rispetto all'host, sempre rispettando l'ordine di esecuzione fornito. Una MQDB è una matrice che ha valori non nulli solo in blocchi di dimensioni $d_1, \dots, d_n$ attorno alla diagonale.
+        
+        L'uso degli stream permette di dividere il carico di lavoro e i trasferimenti di memoria, permettendo un parallelismo tra trasferimenti ed esecuzione dei kernel (DMA permettendo). Sapendo che il prodotto di due matrici MQDB è anch'esso una matrice con le stesse proprietà, lo schema ovvio per l'utilizzo degli stream è quello di utilizzare stream diversi per ogni blocco di dati, permettendo il parallelismo tra trasferimenti e kernel.
+        
+        Codice (forse funzionante):
+        \begin{minted}{cuda}
+__global__ void streamMQDB(int *A, int *B, int *R) {
+    int tid = threadIdx.x + threadIdx.y * blockDim.x;
+    __shared__ int As[BS][BS];
+    __shared__ int Bs[BS][BS];
+
+    As[threadIdx.y][threadIdx.x] = A[tid];
+    Bs[threadIdx.y][threadIdx.x] = B[tid];
+    __syncthreads();
+
+    float sum = 0.0f;
+    for (int k = 0; k < BS; ++k) {
+        sum += As[k][threadIdx.y] * Bs[threadIdx.x][k];
+    }
+    R[tid] = sum;
+}
+        \end{minted}
+    \end{solution}
+    
+    \question Esempio e vantaggi di loop unrolling. Esempio nella reduction.
+    
+    \begin{solution}
+        Il loop unrolling è una tecnica usata per ottimizzare i cicli: questi vengono "srotolati" in modo da ridurre l'overhead dovuto alle operazioni di controllo, ridurre il branching e i salti condizionali, aumentando così il livello di parallelismo. Si copia il corpo del loop un numero $n$ di volte, chiamato unroll factor. Lo si può fare manualmente, in alternativa, CUDA fornisce direttive di compilazione.
+        
+        Esempio semplice di loop unrolling: 
+        \begin{minted}{cuda}
+for (int i = 0; i < 4; i++){
+    A[base] += B[base + i];
+}
+        \end{minted}
+        Può diventare:
+        \begin{minted}{cuda}
+A[base] += B[base + 0];
+A[base] += B[base + 1];
+A[base] += B[base + 2];
+A[base] += B[base + 3];
+        \end{minted}
+        
+        Lo si dovrebbe usare quando il corpo del ciclo è semplice e il numero di iterazioni è multiplo dell'unroll factor. Un unrolling troppo spinto potrebbe causare bloating del codice e riduzione delle performance dovuta a mancanza di spazio in cache/instruction buffer.
+        
+        Esempio nella reduction: loop all'interno del kernel, prima dell'unroll
+        \begin{minted}{cuda}
+for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+    if (threadIdx.x < stride) {
+        smem[threadIdx.x] += smem[threadIdx.x + stride];
+    }
+    __syncthreads();
+}
+        \end{minted}
+        
+        Mentre la versione con unroll è
+        \begin{minted}{cuda}
+if (blockDim.x >= 1024 && threadIdx.x < 512) {
+    smem[threadIdx.x] += smem[threadIdx.x + 512];
+    __syncthreads();
+}
+if (blockDim.x >= 512 && threadIdx.x < 256) {
+    smem[threadIdx.x] += smem[threadIdx.x + 256];
+    __syncthreads();
+}
+if (blockDim.x >= 256 && threadIdx.x < 128) {
+    smem[threadIdx.x] += smem[threadIdx.x + 128];
+    __syncthreads();
+}
+if (blockDim.x >= 128 && threadIdx.x < 64) {
+    smem[threadIdx.x] += smem[threadIdx.x + 64];
+    __syncthreads();
+}
+// Within a single warp
+if (threadIdx.x < 32) {
+    volatile float *vsmem = smem;
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 32];
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 16];
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 8];
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 4];
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 2];
+    vsmem[threadIdx.x] += vsmem[threadIdx.x + 1];
+}
+        \end{minted}
+    \end{solution}
+    
+    \question Esempio di utilizzo della constant memory.
+    
+    \begin{solution}
+        La constant memory è spesso utilizzata per coefficienti che devono essere letti da tutti i thread contemporaneamente. Esempio:
+        \begin{minted}{cuda}
+__constant__ float pi = 3.12;
+
+// Array di cerchi, dato il raggio calcolare l'area
+__global__ void circlesArea (float *area, float *radius, int N) {
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    // Bound check
+    if (tid < N)
+        area[tid] = radius[tid] * pi * pi;
+}
+        \end{minted}
+    \end{solution}
+\end{questions}

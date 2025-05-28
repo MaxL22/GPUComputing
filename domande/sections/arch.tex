@@ -98,8 +98,8 @@
         
         Banalmente, qualsiasi codice senza possibilità di divergenze si comporta come SIMD
         \begin{minted}{cuda}
- __global__ void vectorAdd(const float* A, const float* B, 
-float* C, int N) {
+ __global__ void vectorAdd(const float *A, const float *B, 
+float *C, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < N) {
         C[i] = A[i] + B[i];
@@ -153,68 +153,6 @@ float* C, int N) {
     	Inoltre, uno SM decide quali warp mandare in esecuzione tra quelli candidati/pronti, rendendo inattivi gli warp che richiedono attesa, mascherando così la latenza dovuta a operazioni come trasferimenti di memoria. Si vuole massimizzare l'occupancy, ovvero il rapporto tra thread attivi e thread massimi sostenibili, misurato in warp. 
     \end{solution}
     
-    \question Esempio e vantaggi di loop unrolling. Esempio nella reduction.
-    
-    \begin{solution}
-    	Il loop unrolling è una tecnica usata per ottimizzare i cicli: questi vengono "srotolati" in modo da ridurre l'overhead dovuto alle operazioni di controllo, ridurre il branching e i salti condizionali, aumentando così il livello di parallelismo. Si copia il corpo del loop un numero $n$ di volte, chiamato unroll factor. Lo si può fare manualmente, in alternativa, CUDA fornisce direttive di compilazione.
-    	
-    	Esempio semplice di loop unrolling: 
-    	\begin{minted}{cuda}
-for (int i = 0; i < 4; i++){
-    A[base] += B[base + i];
-}
-    	\end{minted}
-    	Può diventare:
-    	\begin{minted}{cuda}
-A[base] += B[base + 0];
-A[base] += B[base + 1];
-A[base] += B[base + 2];
-A[base] += B[base + 3];
-    	\end{minted}
-    	
-    	Lo si dovrebbe usare quando il corpo del ciclo è semplice e il numero di iterazioni è multiplo dell'unroll factor. Un unrolling troppo spinto potrebbe causare bloating del codice e riduzione delle performance dovuta a mancanza di spazio in cache/instruction buffer.
-        
-        Esempio nella reduction: loop all'interno del kernel, prima dell'unroll
-        \begin{minted}{cuda}
-for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-    if (threadIdx.x < stride) {
-        smem[threadIdx.x] += smem[threadIdx.x + stride];
-    }
-    __syncthreads();
-}
-        \end{minted}
-        
-        Mentre la versione con unroll è
-        \begin{minted}{cuda}
-if (blockDim.x >= 1024 && threadIdx.x < 512) {
-    smem[threadIdx.x] += smem[threadIdx.x + 512];
-    __syncthreads();
-}
-if (blockDim.x >= 512 && threadIdx.x < 256) {
-    smem[threadIdx.x] += smem[threadIdx.x + 256];
-    __syncthreads();
-}
-if (blockDim.x >= 256 && threadIdx.x < 128) {
-    smem[threadIdx.x] += smem[threadIdx.x + 128];
-    __syncthreads();
-}
-if (blockDim.x >= 128 && threadIdx.x < 64) {
-    smem[threadIdx.x] += smem[threadIdx.x + 64];
-    __syncthreads();
-}
-// Within a single warp
-if (threadIdx.x < 32) {
-    volatile float *vsmem = smem;
-    vsmem[threadIdx.x] += vsmem[threadIdx.x + 32];
-    vsmem[threadIdx.x] += vsmem[threadIdx.x + 16];
-    vsmem[threadIdx.x] += vsmem[threadIdx.x + 8];
-    vsmem[threadIdx.x] += vsmem[threadIdx.x + 4];
-    vsmem[threadIdx.x] += vsmem[threadIdx.x + 2];
-    vsmem[threadIdx.x] += vsmem[threadIdx.x + 1];
-}
-        \end{minted}
-    \end{solution}
-    
     \question Cos'è la scalabilità? Come vengono misurati i tempi e lo speedup.
     
     \begin{solution}
@@ -259,33 +197,6 @@ if (threadIdx.x < 32) {
         Permette di stabilire le feature e funzionalità hardware disponibili. Viene usato in fase di compilazione per stabilire l'architettura per cui compilare.
     \end{solution}
     
-    \question Uso degli stream per il prodotto di matrici diagonali a blocchi MQDB.
-    
-    \begin{solution}
-    	Gli stream sono una sequenza di operazioni CUDA incapsulate in una coda FIFO, eseguite dalla GPU in maniera asincrona rispetto all'host, sempre rispettando l'ordine di esecuzione fornito. Una MQDB è una matrice che ha valori non nulli solo in blocchi di dimensioni $d_1, \dots, d_n$ attorno alla diagonale.
-    	
-    	L'uso degli stream permette di dividere il carico di lavoro e i trasferimenti di memoria, permettendo un parallelismo tra trasferimenti ed esecuzione dei kernel (DMA permettendo). Sapendo che il prodotto di due matrici MQDB è anch'esso una matrice con le stesse proprietà, lo schema ovvio per l'utilizzo degli stream è quello di utilizzare stream diversi per ogni blocco di dati, permettendo il parallelismo tra trasferimenti e kernel.
-    	
-    	Codice (forse funzionante):
-    	\begin{minted}{cuda}
-__global__ void streamMQDB(int *A, int *B, int *R) {
-    int tid = threadIdx.x + threadIdx.y * blockDim.x;
-    __shared__ int As[BS][BS];
-    __shared__ int Bs[BS][BS];
-	
-    As[threadIdx.y][threadIdx.x] = A[tid];
-    Bs[threadIdx.y][threadIdx.x] = B[tid];
-    __syncthreads();
-	
-    float sum = 0.0f;
-    for (int k = 0; k < BS; ++k) {
-        sum += As[k][threadIdx.y] * Bs[threadIdx.x][k];
-    }
-    R[tid] = sum;
-}
-    	\end{minted}
-    \end{solution}
-    
     \question Come vengono schedulati i blocchi sugli SM?
     
     \begin{solution}
@@ -311,36 +222,6 @@ __global__ void streamMQDB(int *A, int *B, int *R) {
         L'esecuzione di un kernel può cominciare alla fine dei trasferimenti di memoria necessari, ma con grandi quantità di dati sarebbe preferibile caricare una porzione dei dati e cominciare l'esecuzione, lasciando al DMA il caricamento dei dati restanti, parallelamente all'esecuzione del kernel. Gli stream permettono di fare questo, abilitano la concorrenza tra trasferimenti di memoria e kernel.
         
         Permettono la sovrapposizione di trasferimento dati ed esecuzione del kernel.
-    \end{solution}
-    
-    \question Mostrare un uso pratico degli stream CUDA.
-    
-    \begin{solution}
-        Gli stream vengono utilizzati per sovrapporre trasferimenti di memoria con computazioni da parte della GPU. Uno schema di utilizzo può essere: 
-        \begin{minted}{cuda}
-// Si suppongono già fatte le allocazioni di memoria
-
-//Creazione degli stream
-cudaStream_t stream1, stream2;
-cudaStreamCreate(&stream1);
-cudaStreamCreate(&stream2);
-
-// Trasferimenti e lancio kernel separati
-cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, stream1);
-cudaMemcpyAsync(dst, src, len, cudaMemcpyHostToDevice, stream2);
-kernel<<<grid, block, smem, stream1>>>();
-kernel<<<grid, block, smem, stream2>>>();
-cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, stream1);
-cudaMemcpyAsync(dst, src, len, cudaMemcpyDeviceToHost, stream1);
-
-// Attendere che gli stream termina
-cudaStreamSynchronize(stream1);
-cudaStreamSynchronize(stream2);
-
-// Rilascio delle risorse
-cudaStreamDestroy(stream1);
-cudaStreamDestroy(stream2);
-        \end{minted}
     \end{solution}
     
     \question Come può la divergenza causare deadlock?

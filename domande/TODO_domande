@@ -16,15 +16,7 @@ Domande in dubbio:
 - Mostrare il grafico del stream CUDA nel caso di blocco MQDB
     What
 
+Pseudocodice per varie pattern possibili?
+    Ad esempio: uso degli stream, uso della smem
 
-
-- Somma di matrici utilizzando numba
-
-- Codice kernel del prodotto(?) di matrici triangolari superiori (credo fosse il prodotto)
-
-- commentare un kernel CUDA python semplice
-
-- Dare il kernel (anche in pseudocodice) della somma matriciale in Numba
-
-    @cuda.jit
-    def matsum (A, B) :
+Da fare anche per python, qualche idea base

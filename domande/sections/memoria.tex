@@ -31,20 +31,6 @@
         La memoria \textbf{unified} è un modello di memoria automatico in cui host e device condividono lo spazio di indirizzamento, tutte le CPU e GPU del sistema possono accedere a questa memoria. Il sistema sottostante si occupa di gestire le migrazioni di memoria secondo necessità, in maniera trasparente all'applicazione. Può essere allocata con \texttt{cudaMallocManaged()} e permette di semplificare notevolmente la programmazione, evitando tutte le copie di dati esplicite, ma si ha overhead di migrazione quando viene fatto l'accesso ai dati.
     \end{solution}
     
-    \question Come usare la shared memory per le convoluzioni.
-    
-    \begin{solution}
-        Un possibile schema per la convoluzione usando la shared memory è quello del tiling: a ogni blocco della grid viene affidato un "tile" (sotto-blocco) dell'immagine in input, ogni thread nel blocco si occupa di un prodotto della convoluzione. 
-        
-        In shared memory vanno caricati tutti i possibili dati a cui il blocco deve fare accesso, ovvero la porzione dell'immagine di cui si occupa, assieme all'area data dal raggio della maschera di convoluzione (un "alone" attorno al sotto-blocco stesso).
-        
-        Rimane il problema di come caricare i blocchi in shared memory: i dati sono più del blocco stesso, sarebbe ottimale dividere il più equamente possibile il carico di lavoro. 
-        
-        Un'idea può essere dare un ordine ai thread e "ripetere" il thread block sopra la sotto-matrice formata da tutti i dati da caricare. Tiling della zona da caricare in smem.
-        
-        L'uso della shared memory permette di limitare gli accessi alla memoria globale, incrementando la velocità degli accessi successivi, ma sono da tenere in conto possibili bank conflict (la shared memory è divisa in bank, se due o più thread vogliono accedere alla stessa bank vanno serviti serialmente) e la quantità di memoria shared utilizzata influisce sul numero di blocchi attivi concorrentemente su un singolo SM.
-    \end{solution}
-    
     \question Modalità di accesso alla device memory e performance.
     
     \begin{solution}
@@ -140,68 +126,7 @@ kernel<<<grid, block, shared_bytes>>>();
         Se più thread accedono in parallelo a indirizzi mappati a bank diversi, questi accessi possono avvenire in parallelo, altrimenti, se due o più thread vogliono accedere allo stesso bank si ha un bank conflict e gli accessi vengono serializzati. Si vogliono quindi evitare i conflitti per utilizzare la massima banda disponibile.
     \end{solution}
     
-    \question Pseudocodice del trasferimento in memoria shared per il prodotto matriciale.
-    
-    \begin{solution}
-    	L'idea dietro l'uso della smem è: vogliamo suddividere in tile le zone di memoria della matrici di cui fare il prodotto (divise in \texttt{nblocks} tile della dimensione del block), in modo da poterle caricare con una suddivisione del lavoro più equa possibile. Per il numero di tile \texttt{nblocks} quindi si ripete il processo di 
-    	\begin{itemize}
-    		\item caricare i valori delle due matrici in smem
-    		
-    		\item calcolare la somma parziale data dai valori parziali caricati, per ogni cella della matrice prodotto
-    	\end{itemize}
-    	
-    	Una volta terminato, scrivere i valori in memoria globale.
-    	
-    	Pseudocodice:
-    	\begin{center}
-    		\begin{minipage}{.9\textwidth}
-    			\begin{tcolorbox}[
-    				colback=white,
-    				sharp corners,
-    				boxrule=.3mm,
-    				left=20pt,
-    				top=0pt,
-    				bottom=0pt,
-    				colbacktitle=white,
-    				coltitle=black
-    				]
-    				\LinesNumbered
-    				\begin{algorithm}[H]
-    					\SetAlgoNoEnd
-    					\SetKwSty{texttt}
-    					\SetArgSty{relax}
-    					\texttt{\_\_shared\_\_ As[WIDTH][WIDTH]}; \\
-    					\texttt{\_\_shared\_\_ Bs[WIDTH][WIDTH]}; \\
-    					\texttt{nblocks =} numero di block contenuti nelle sotto-matrici da caricare; \\
-    					\For{$i \in$ \texttt{nblocks}}{
-    						\texttt{As[tidy][tidx] = A[tidx\_abs + $i$ * WIDTH][tidy\_abs]}; \\
-    						\texttt{Bs[tidy][tidx] = B[tidx\_abs][tidy\_abs + $i$ * WIDTH]}; \\
-    						\texttt{\_\_syncthreads()}; \\
-    						
-    						\For{$j \in$ \texttt{WIDTH}}{
-    							\texttt{partial\_sum += As[tidy][j] * Bs[j][tidx]}; \\
-    						}
-    						\texttt{\_\_syncthreads()};\\
-    					}
-    					\texttt{// Scrivere il risultato in memoria globale}
-    				\end{algorithm}
-    			\end{tcolorbox}
-    		\end{minipage}
-    	\end{center}
-        
-        Dove: 
-        \begin{itemize}
-            \item \texttt{WIDTH} è la dimensione del blocco di dati da caricare
-            
-            \item \texttt{tidx} e \texttt{tidy} sono le coordinate del thread all'interno del blocco
-        
-            \item \texttt{tidx\_abs} e \texttt{tidy\_abs} sono le coordinate del thread rispetto alla grid
-            
-            \item \texttt{nblocks} rappresenta il ceil della larghezza (o altezza) della matrice fratto la larghezza (o altezza) del block
-        \end{itemize}
-    \end{solution}
-    
-    \question Constant memory e suo utilizzo.
+    \question Constant memory e il suo utilizzo.
     
     \begin{solution}
         Si tratta di una memoria che risiede nella device memory, con una cache dedicata per ogni SM. La si può definire tramite l'attributo \texttt{\_\_constant\_\_}, permette di ospitare dati di sola lettura, ideale per accessi uniformi. Ha scope globale, va dichiarata al di fuori dei kernel e staticamente.
