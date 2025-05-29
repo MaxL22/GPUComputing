@@ -23,7 +23,7 @@ t  = torch.empty(x, y)
     \end{minted}
     i parametri sono le dimensioni
     
-    \item Ma spesso li si vuole inizializzare con un \textbf{valore}, tipicamente 0,1 oppure casuali:
+    \item Ma spesso li si vuole inizializzare con un \textbf{valore}, tipicamente 0, 1 oppure casuali:
     \begin{minted}{python}
 t = torch.zeros(x, y)
 t = torch.ones(x, y)
@@ -71,7 +71,9 @@ t[:, 0, 0]
 \end{minted}
 restituisce l'elemento in alto a sinistra di ogni elemento presente all'interno del tensore. Ovviamente si possono anche accedere elementi arbitrari in ogni dimensione.
 
-\paragraph{Broadcasting:} Da NumPy viene copiato il broadcasting, se le dimensioni non coincidono, il risultato "estende" gli elementi del più piccolo. Esempio:
+\paragraph{Broadcasting:} Da NumPy viene copiato il broadcasting, se le dimensioni non coincidono, il risultato "estende" la dimensione minore. 
+
+Esempi:
 \begin{center}
     \begin{tabular}{| c | c | c |}
         \hline 
@@ -92,15 +94,43 @@ restituisce l'elemento in alto a sinistra di ogni elemento presente all'interno 
     \end{tabular}
 \end{center}
 
-\subsubsection{Spostarli sulla GPU}
+\begin{center}
+    \begin{tabular}{| c | c | c |}
+        \hline
+        \texttt{1} & \texttt{2} & \texttt{3} \\
+        \hline
+    \end{tabular}
+    $\cdot$
+    \begin{tabular}{| c |}
+        \hline
+        \texttt{1} \\
+        \hline
+        \texttt{2} \\
+        \hline 
+        \texttt{3} \\
+        \hline
+    \end{tabular}
+    $=$
+    \begin{tabular}{| c | c | c |}
+        \hline
+        \texttt{1} & \texttt{2} & \texttt{3} \\
+        \hline
+        \texttt{2} & \texttt{4} & \texttt{6} \\
+        \hline
+        \texttt{3} & \texttt{6} & \texttt{9} \\
+        \hline
+    \end{tabular}
+\end{center}
 
-Gli attributi di un tensore sono: forma, tipo di dato e \textbf{dispositivo su cui si trova}; quest'ultimo può essere CPU o GPU. Di default, i tensori vengono creati sulla GPU. Se disponibile, vorremmo sfruttare il backend più efficiente dato dalla GPU. 
+\subsubsection{Spostare sulla GPU}
+
+Gli attributi di un tensore sono: forma, tipo di dato e \textbf{dispositivo su cui si trova}; quest'ultimo può essere CPU o GPU. Di default, i tensori vengono creati sulla GPU. Se disponibile, vorremmo sfruttare il backend più efficiente dato dalla GPU. Vogliamo spostare sulla GPU i tensori in uso.
 
 Per vedere se una GPU è disponibile ed eventualmente i parametri della GPU in uso:
 \begin{minted}{python}
-print(torch.cuda.is_available()) # Check CUDA availability
-print(torch.cuda.current_device()) # Current CUDA device
-print(torch.cuda.get_device_name(0)) # Name of the device
+torch.cuda.is_available() # Check CUDA availability
+torch.cuda.current_device() # Current CUDA device
+torch.cuda.get_device_name(0) # Name of the device
 \end{minted}
 
 Dopo aver controllato che un device sia disponibile, si possono muovere i tensori su di esso
@@ -113,9 +143,9 @@ Dopo aver controllato che un device sia disponibile, si possono muovere i tensor
 Esempi:
 \begin{minted}{python}
 cuda = torch.device('cuda:0')
-
+# Per crearlo sulla GPU
 t1 = torch.tensor([1, 2, 3], device=cuda)
-
+# Per spostarlo
 t2 = torch.tensor([1, 2, 3])
 t_g = t2.to(cuda)
 \end{minted}
@@ -143,28 +173,30 @@ $$ L (\bm w, b) = \frac{1}{n} \sum_{i=1}^{n} \ell^{(i)} (\bm w, b) = \frac{1}{n}
 
 Si vuole ottimizzare la loss function rispetto ai parametri, utilizzando l'algoritmo di \href{https://it.wikipedia.org/wiki/Discesa_del_gradiente}{\texttt{gradient descent}}. L'idea è di calcolare il rate di cambiamento della loss function rispetto a ogni parametro e modificare ciascuno di questi nella direzione che porta a ridurre la loss il più possibile.
 
-Bisogna decidere un $\delta$ che determina "quanto lontano guardare" sulla loss function per determinare la direzione in cui decresce di più; se i parametri variano troppo in fretta rispetto alla loss function potrebbe essere difficile capire in che direzione l'errore si riduce maggiormente.
+Bisogna decidere un $\delta$ che determina "quanto lontano guardare" sulla loss function per determinare la direzione in cui decresce di più. Su pesi e bias si "guarda" $\pm \delta$ per guardare dove la funzione decresce maggiormente.
+
+Se i parametri variano troppo in fretta rispetto alla loss function potrebbe essere difficile capire in che direzione l'errore si riduce maggiormente.
 
 Va determinato anche un learning rate $\eta$ che determina di quanto variare i parametri al termine dell'iterazione, sempre secondo la direzione determinata precedentemente.
 
 \href{it.wikipedia.org/wiki/Gradiente}{\texttt{Se vuoi sapere come si calcola il gradiente.}}
 
-Si vuole calcolare la derivata della loss rispetto a un parametro, per farlo possiamo applicare la chain rule e calcolare la derivata della loss rispetto al suo input moltiplicato la derivata del modello $m$ (si intende il modello della funzione usata per fare la regressione, in questo caso lineare, quindi $wx + b$) rispetto al parametro.
+Si vuole calcolare la derivata della loss rispetto a un parametro, per fare ciò applicare la chain rule e calcolare la \textbf{derivata della loss rispetto al suo input moltiplicato la derivata del modello} $m$ (si intende il modello della funzione usata per fare la regressione, in questo caso lineare, quindi $wx + b$) rispetto al parametro
 $$ \nabla_{w,b} = \left( \frac{\partial L}{\partial w}, \frac{\partial L}{\partial b}\right) = \left(\frac{\partial L}{\partial m} \cdot \frac{\partial m}{\partial w}, \frac{\partial L}{\partial m} \cdot \frac{\partial m}{\partial b}\right) $$
 
-Dopo aver inizializzato i parametri, li si aggiornano finché $\bm w$ e $b$ non cambiano più (variazione al di sotto di un $\epsilon$), oppure si fissa un numero massimo di iterazioni (ci sono altre termination conditions possibili, ma sticazzi).
+Dopo aver inizializzato i parametri, li si aggiorna finché $\bm w$ e $b$ non cambiano più (variazione $\leq \epsilon$), oppure si fissa un numero massimo di iterazioni (ci sono altre termination conditions possibili, ma sticazzi).
 
 Se l'aggiornamento dei parametri è troppo grande, si può avere un'oscillazione eccessiva del modello e conseguente divergenza del training.
 
 \paragraph{Normalizzazione:} I gradienti di matrice dei pesi e bias sono solitamente su ordini di grandezza diversi, rendendo un solo learning rate inefficace. 
 
-Al posto che usare più learning rate diversi, si normalizzano i valori all'interno di un range.
+Al posto che usare più learning rate diversi, si \textbf{normalizzano i valori all'interno di un range}.
 
-\paragraph{Sequential lerning:} Al posto che processare l'intero data set assieme, si può considerare un punto per volta, aggiornando i parametri dopo ognuno di questi (online learning).
+\paragraph{Sequential lerning:} Al posto che processare l'intero data set assieme, si può considerare un punto per volta, aggiornando i parametri dopo ognuno (\textbf{online learning}).
 
-Esempio di algoritmo di apprendimento sequenziale è stochastic (sequential) gradient descent. 
+Esempio di algoritmo di apprendimento sequenziale è \textbf{stochastic} (\textbf{sequential}) \textbf{gradient descent}. 
 
-I modelli vengono addestrati facendo training: con questo termine si intende un'ottimizzazione iterativa dell'algoritmo che aggiorna i parametri in una direzione che decresce la error function man mano.
+I modelli vengono addestrati facendo \textit{training}: con questo termine si intende un'ottimizzazione iterativa dell'algoritmo che aggiorna i parametri in una direzione che decresce la error function man mano.
 
 \paragraph{Algoritmo gradient descent:} Un possibile algoritmo:
 \begin{enumerate}
@@ -181,9 +213,9 @@ I modelli vengono addestrati facendo training: con questo termine si intende un'
     
     \item Ritorna i valori $\bm w$
 \end{enumerate}
-Downside: calcolare il gradiente di $L$ su tutto il training set per un singolo update è troppo costoso.
+Problema: calcolare il gradiente di $L$ su tutto il training set per un singolo update è troppo costoso.
 
-\paragraph{Minibatch Stochastic Gradient Descent (SGD):} Come prima, ma batch più piccoli: 
+\paragraph{Minibatch Stochastic Gradient Descent (SGD):} Come prima, ma con piccoli batch:
 \begin{enumerate}
     \item Inizializza casualmente i valori
     
@@ -199,7 +231,9 @@ Downside: calcolare il gradiente di $L$ su tutto il training set per un singolo 
     \end{itemize}
 \end{enumerate}
 
-Come scegliamo learning rate $\eta$ e dimensione del minibatch $|\beta|$? Possono essere specificati manualmente, con poi eventuale tuning. In generale non possono essere troppo piccoli (troppo tempo, workload troppo piccolo) o troppo grandi (oscillazioni, problemi di memoria).
+Come scegliamo learning rate $\eta$ e dimensione del minibatch $|\beta|$? Possono essere specificati manualmente, con poi eventuale tuning. 
+
+In generale, non possono essere troppo piccoli (troppo tempo, workload troppo piccolo) o troppo grandi (oscillazioni, problemi di memoria).
 
 \subsubsection{Autograd}
 
@@ -210,6 +244,14 @@ Per applicare autograd, è necessario riscrivere modello e loss function usando 
 Ogni tensore derivato da uno con \texttt{requires\_grad=True} manterrà uno storico delle sue computazioni. 
 
 Dopo aver chiamato \texttt{.backward()}, PyTorch calcola automaticamente il gradiente in \texttt{.grad} (se differenziabile). 
+
+Esempio:
+\begin{minted}{python}
+loss = loss_function(model(t_u, *params), t_c)
+loss.backward()
+print(params.grad)
+# tensor([4517.2969, 82.6000])
+\end{minted}
 
 \paragraph{Altri optimizer:} Oltre al classico gradient descent, si possono utilizzare altri modelli di ottimizzazione, tramite \texttt{torch.optim}.
 
@@ -227,11 +269,51 @@ optimizer = torch.optim.SGD(params, lr=learning_rate)
 
 \subsection{Multi Layer Perceptron MLP}
 
-Reti neurali con un solo layer sono limitati, usiamo i \href{https://it.wikipedia.org/wiki/Percettrone_multistrato}{\texttt{Multilayer Perceptrons}}, per avere più espressività.
+Reti neurali con un solo layer sono limitati, usiamo i \href{https://it.wikipedia.org/wiki/Percettrone_multistrato}{\texttt{Multilayer Perceptrons}}, per permettere più \textit{espressività} al modello (non solo lineare). Dai che lo sai come funzionano, non li voglio spiegare.
 
-Dai che lo sai come funzionano.
+Le cose importanti sono: 
+\begin{itemize}
+    \item Struttura: ingresso, hidden layers, uscita
+    
+    \item I neuroni hanno funzioni di attivazione, solitamente non lineari, possono essere di diverso tipo
+    
+    \item Il training funziona tipo:
+    \begin{center}
+        \begin{minipage}{.9\textwidth}
+            \begin{tcolorbox}[
+                colback=white,
+                sharp corners,
+                boxrule=.3mm,
+                left=20pt,
+                top=0pt,
+                bottom=0pt,
+                colbacktitle=white,
+                coltitle=black
+                ]
+                \LinesNumbered
+                \begin{algorithm}[H]
+                    \SetAlgoNoEnd
+                    \SetKwSty{texttt}
+                    \SetArgSty{relax}
+                    \For{$n$ epoche}{
+                        \texttt{dividi dataset in batch}\\
+                        \For{\texttt{every batch}}{
+                            \For{\texttt{every sample}}{
+                                \texttt{valutazione del modello}\\
+                                \texttt{calcolo della loss}\\
+                                \texttt{gradient backpropagation}\\
+                            }
+                            \texttt{update del modello}
+                        }
+                        
+                    }
+                \end{algorithm}
+            \end{tcolorbox}
+        \end{minipage}
+    \end{center}
+\end{itemize}
 
-\subsubsection{Modulo nn}
+\subsubsection{Modulo \texttt{nn}}
 
 PyTorch fornisce un modulo \texttt{nn} dedicato alla costruzione di reti neurali.
 
@@ -256,4 +338,4 @@ seq_model = nn.Sequential(
     nn.Linear(13, 1))
 \end{minted}
 
-%check maybe?
+Si può quindi iterare il processo di training della rete.

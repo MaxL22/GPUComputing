@@ -27,14 +27,12 @@
 \usepackage{algorithm2e}
 \usepackage{tcolorbox}
 \usepackage{bm}
+\usepackage{fontspec}
 
 \tikzstyle{block} = [draw, rectangle, minimum height=2em, minimum width=3em]
 
 \renewcommand{\contentsname}{Indice}
-
 \newcommand{\np}{\mathcal{NP}}
-
-%\includeonly{chapters/torch}
 
 \begin{document}
     \maketitle
@@ -42,8 +40,9 @@
     \begin{figure}[h!]
         \centering
         \includegraphics[width=0.5\linewidth]{img/Gigi}
-        \caption*{"My star, my perfect silence" G.G.}
+        \caption*{{\setmainfont{Handodle} To G.G. \\ My star, My perfect silence.}}
     \end{figure}
+    
 	\tableofcontents
 	\newpage	
 	
@@ -62,5 +61,3 @@
     \include{chapters/torch}
 
 \end{document}
-
-%Appunti notions: manca cap 9, da fare nelle ultime lezioni?
