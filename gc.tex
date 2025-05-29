@@ -4,6 +4,7 @@
 \date{}
 
 \documentclass[11pt]{article}
+\usepackage{caption}
 \usepackage{graphicx} 
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -25,6 +26,7 @@
 \usetikzlibrary{trees, arrows.meta, positioning, calc}
 \usepackage{algorithm2e}
 \usepackage{tcolorbox}
+\usepackage{bm}
 
 \tikzstyle{block} = [draw, rectangle, minimum height=2em, minimum width=3em]
 
@@ -32,8 +34,16 @@
 
 \newcommand{\np}{\mathcal{NP}}
 
+%\includeonly{chapters/torch}
+
 \begin{document}
-	\maketitle
+    \maketitle
+    
+    \begin{figure}[h!]
+        \centering
+        \includegraphics[width=0.5\linewidth]{img/Gigi}
+        \caption*{"My star, my perfect silence" G.G.}
+    \end{figure}
 	\tableofcontents
 	\newpage	
 	
@@ -45,9 +55,11 @@
 
 	\include{chapters/opt}
 	
-	\include{chapters/python}
+     \include{chapters/pattern}
     
-    \include{chapters/pattern}
+	\include{chapters/numba}
+    
+    \include{chapters/torch}
 
 \end{document}
 

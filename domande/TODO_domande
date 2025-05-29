@@ -1,14 +1,4 @@
 Domande in dubbio:
-- mostrare il pseudo codice dell'algoritmo di boruvka
-    NSY
-- Fare uno schema di una BFS parallela
-    NSY
-- DAG nella rappresentazione di task
-    What
-- Come risolvere il problema di calcolare la media di 1M immagini di dimensione fissata
-    What
-- Descrivere un algoritmo di sorting parallelo.
-    Ok questa la so, ma ce ne sono altri?
 - Sincronizzazione a due livelli di CUDA.
     Cosa vuol dire?
 - Mostrare il grafico del parallelismo dinamico nel caso di prodotto matriciale con matrici diagonali a blocco MQDB
