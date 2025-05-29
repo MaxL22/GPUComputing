@@ -1,12 +1,161 @@
-Domande in dubbio:
-- Sincronizzazione a due livelli di CUDA.
-    Cosa vuol dire?
-- Mostrare il grafico del parallelismo dinamico nel caso di prodotto matriciale con matrici diagonali a blocco MQDB
-    What
-- Mostrare il grafico del stream CUDA nel caso di blocco MQDB
-    What
-
 Pseudocodice per varie pattern possibili?
     Ad esempio: uso degli stream, uso della smem
-
 Da fare anche per python, qualche idea base
+
+- MLP in cuda, descrivi un layer a piacere
+
+Domande per sezione, si ringrazia Chad Gepete:
+
+1. Introduzione all’High Performance Computing (HPC)
+Che vantaggi offre l’uso delle GPU rispetto alle CPU nei calcoli parallelizzabili?
+Come si definisce il parallelismo nei dati e perché è importante?
+Quali sono le differenze principali tra parallelismo di dati, di task e di istruzioni?
+Cos’è il paradigma GP-GPU e come si distingue dal modello tradizionale CPU-only?
+Quali sono le responsabilità della CPU e della GPU in un’applicazione ibrida?
+Come avviene la comunicazione tra CPU (host) e GPU (device)?
+Qual è il ruolo dei kernel in CUDA e perché vanno riscritti per la GPU?
+Come incide il consumo di energia sulle scelte di progettazione di un’applicazione HPC?
+Descrivi la tassonomia di Flynn e fornisci un esempio per ogni categoria.
+Cosa si intende per modello SIMT e come differisce dal SIMD?
+Quali sono gli elementi chiave del modello di calcolo SIMT esposti dalla GPU?
+In che modo il controllo di flusso individuale nei thread impatta sulle prestazioni?
+Quali problemi potrebbero insorgere se ci fosse forte divergenza nei thread?
+Perché è fondamentale conoscere l’architettura hardware durante lo sviluppo di kernel?
+Spiega la gerarchia di memoria e thread da SM a grid.
+Che cos’è l’occupancy e come si può massimizzarla?
+Perché la località di dati è cruciale per le prestazioni GPU?
+In che casi l’uso delle GPU non è conveniente rispetto alle CPU?
+Quali sono i principali vincoli hardware delle GPU moderne?
+Descrivi un esempio di applicazione reale che beneficia del parallelismo GPU.
+
+2. Modelli per sistemi paralleli
+Che cos’è un modello di programmazione parallela e quali livelli di astrazione comprende?
+In cosa consiste il modello PRAM e quali assunzioni fa?
+Qual è la differenza tra modelli SIMD e MIMD all’interno del PRAM?
+Spiega come il modello PRAM gestisce le operazioni di lettura/scrittura concorrente.
+Quali sono i limiti pratici del modello PRAM?
+Descrivi il concetto di processi e thread in ambiente UNIX.
+Come avviene il context switch tra processi e quali costi comporta?
+Quali vantaggi offrono i thread rispetto ai processi in UNIX?
+In che modo i thread condividono lo spazio di indirizzamento?
+Quali stati può assumere un thread e cosa rappresentano?
+Perché è necessario un meccanismo di sincronizzazione tra thread?
+Quando può verificarsi una race condition e come si può evitare?
+Spiega il ruolo dei primitive di sincronizzazione a livello di blocco.
+Qual è la differenza tra sincronizzazione a livello di blocco e a livello di warp?
+In quali scenari il modello di processi UNIX è ancora preferibile?
+Come si crea un nuovo processo a runtime in UNIX?
+Che cos’è un Thread Control Block (TCB)?
+Quali risorse alloca un processo e quali condivide un thread?
+Descrivi un esempio di applicazione che sfrutta i processi UNIX in parallelo.
+Quali strumenti UNIX aiutano nel debug di applicazioni multithread?
+
+3. Modello CUDA
+Quali passi compongono la "ricetta" base per programmare in CUDA?
+Come si differenziano i kernel annotati con global, device e host?
+In che modo il lancio asincrono di un kernel impatta il flusso di controllo?
+Come si calcola l’indice lineare di un thread in una griglia 2D?
+Quali sono i limiti di dimensione per block e grid in CUDA?
+Descrivi il mapping logico-fisico di thread→CUDA core→SM→grid.
+Per quale motivo è fondamentale evitare la divergenza nei warp?
+Cos’è un warp e quante unità di thread lo compongono?
+Come funziona lo scheduler dei warp all’interno di uno SM?
+Quali metriche influenzano l’occupancy di un kernel?
+In che modo si misura il tempo di esecuzione di un kernel lato host?
+Che tipo di errori possono restituire le chiamate CUDA e come si gestiscono?
+Spiega la differenza tra memorie registri, shared e global memory.
+Quale pattern di accesso rende più efficiente la global memory?
+Cosa sono le operazioni atomiche e quando servono?
+Come viene implementata la parallel reduction su un array?
+Quali sono i vantaggi del tiling nella convoluzione 1D/2D?
+Descrivi il calcolo dell’istogramma RGB con atomicAdd().
+Cosa si intende per "cooperative groups" in CUDA 9.0+
+Quando conviene usare la memoria constant o texture rispetto alla global?
+
+4. Ottimizzazione delle Prestazioni
+Quali strategie principali guidano l’ottimizzazione delle performance GPU?
+Come si usa nvidia-smi per interrogare le proprietà hardware?
+Che informazioni fornisce cudaGetDeviceProperties()?
+Cosa si intende per register spilling e come si può gestire?
+Quali tool Nvidia permettono di effettuare profiling a livello di sistema?
+In cosa differiscono Nsight Compute e Nsight Systems?
+Come si interpreta il rapporto tra latenza di memoria e throughput?
+Quali vantaggi offre il loop unrolling e quando applicarlo?
+Cosa comporta l’unrolling a livello di warp?
+Cos’è il parallelismo dinamico e come si attiva in CUDA?
+Descrivi l’uso dei CUDA Streams per la concorrenza host-device.
+Come si misura il tempo di trasferimento host-device in modo asincrono?
+In che modo gli eventi CUDA permettono di sincronizzare flussi diversi?
+Quali librerie CUDA facilitano l’ottimizzazione (cuBLAS, cuRAND)?
+Quando conviene sfruttare cuBLAS per operazioni di algebra lineare?
+Come si utilizza cuRAND per generare numeri casuali sulla GPU?
+Quali tecniche esistono per ridurre il memory thrashing?
+Come bilanciare l’uso di risorse tra calcolo e memoria?
+Quali metriche di Nsight Compute sono utili per identificare i colli di bottiglia?
+Descrivi un esempio pratico di ottimizzazione su un kernel reale.
+
+5. Pattern Paralleli
+Cosa si intende per pattern di calcolo parallelo e perché sono utili?
+Come funziona il pattern scan (prefix-sum) e dove si applica?
+Qual è l’implementazione di Horn per il prefix-sum su GPU?
+In cosa consiste la strategia work-efficient per il scan?
+Descrivi l’algoritmo Greedy sequenziale per il graph coloring.
+Cos’è l’algoritmo di Jones-Plassman e quali vantaggi offre?
+Come si definisce un insieme indipendente massimale (MIS)?
+Spiega l’algoritmo randomized MIS e il suo vantaggio parallelo.
+Quali sono le caratteristiche del bitonic mergesort?
+Come viene realizzato l’ordinamento bitonico su GPU?
+Quali proprietà devono avere gli operatori di reduction nei pattern?
+Quando conviene usare un pattern scan rispetto a una reduction?
+In che scenari il graph coloring parallelo trova applicazione?
+Qual è il ruolo del tiling nei pattern di prodotto matriciale?
+Come si valuta l’efficacia di un pattern parallelo su GPU?
+Quali strumenti aiutano a visualizzare i pattern di memoria?
+Come si combinano più pattern (es. scan + reduction) in un algoritmo?
+Descrivi il pattern map per trasformazioni di vettori.
+Quando serve un pattern gather/scatter e come implementarlo?
+Quali differenze ci sono tra pattern generici e specifici di dominio?
+
+6. Numba
+Quali differenze esistono tra Numba for CPU e Numba for GPU?
+Come si annota una funzione Python per l’esecuzione su GPU con Numba?
+Quali primitive di memoria offre Numba GPU per l’allocazione?
+Come si gestiscono le operazioni atomiche in Numba GPU?
+In che modo Numba supporta i streams e il parallelismo dinamico?
+Quali limitazioni ha Numba rispetto alla programmazione CUDA C++?
+Come si ottimizza il kernel Numba per ridurre il register spilling?
+Descrivi un esempio di uso di Numba per un prefix-sum.
+Quando conviene usare Numba per prototipazione rapida?
+Qual è l’impatto delle compile-time annotations sulla performance?
+In cosa differisce la gestione della memoria tra host e device in Numba?
+Come si sincronizza l’esecuzione tra host e device in Numba?
+Quali tool di profiling si possono usare con Numba?
+Come integrare codice CUDA C++ esistente in un progetto Numba?
+Descrivi un caso di uso di Numba per l’elaborazione di immagini.
+Quali pattern di accesso a memoria vanno ottimizzati in Numba?
+Come si misura il tempo di esecuzione dei kernel Numba?
+Quali vantaggi offre Numba nell’ambito del machine learning?
+In che casi non è consigliato usare Numba GPU?
+Quali best practice seguire per scrivere kernel Numba efficienti?
+
+7. PyTorch
+Come vengono rappresentati i tensori in PyTorch e in che modo supportano la GPU?
+Quali operazioni fondamentali si possono eseguire sui tensori?
+Come si trasferisce un tensore sulla GPU in PyTorch?
+Qual è la differenza tra .to(device) e .cuda()?
+Descrivi il funzionamento del modulo nn per costruire reti neurali.
+Come funziona la discesa del gradiente in PyTorch?
+Cos’è Autograd e come traccia le operazioni sui tensori?
+In che modo PyTorch gestisce la differenziazione automatica?
+Come implementare un MLP usando torch.nn.Sequential?
+Qual è il ruolo degli optimizer in PyTorch e come si configurano?
+Come si definisce una funzione di perdita custom?
+Quali metodi esistono per salvare/caricare modelli PyTorch?
+Come si esegue il multithreading nel DataLoader?
+In che modo si possono sfruttare le GPU multiple in PyTorch?
+Quali strumenti di profiling offre PyTorch per le GPU?
+Come utilizzare i tensorboard logger con PyTorch?
+Descrivi un esempio di training di un MLP su dati sintetici.
+Come si misura il throughput di training in PyTorch?
+Quali accorgimenti prendere per evitare l’out of memory sulla GPU?
+In che modo PyTorch sfrutta la unified memory su sistemi recenti?

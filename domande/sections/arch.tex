@@ -90,7 +90,7 @@
         
         \textbf{Single Instruction Multiple Thread SIMT:} Modello introdotto da CUDA che estende SIMD, fornendo a ogni unità di esecuzione (thread) la possibilità di divergere dalle altre, in base ai dati. 
         
-        Il flusso di controllo parte parallelo, ma, in base ai dati, ogni thread può intraprendere un flusso diverso. Per fare ciò è necessario che ogni unità di esecuzione possieda un program counter e register set. In realtà, all'interno di CUDA, il PC è uno per ogni warp (gruppo di 32 thread), i quali eseguono le istruzioni in lock-step e nel caso di divergenza i diversi path vanno eseguiti serialmente.
+        Il flusso di controllo parte parallelo, ma, in base ai dati, ogni thread può intraprendere un flusso diverso. Per fare ciò è necessario che ogni unità di esecuzione possieda un program counter e register set. I thread all'interno di un warp eseguono le istruzioni in lock-step e, nel caso di divergenza, i diversi path vanno eseguiti serialmente.
         
         Oltre al costo "architetturale", si ha un costo in termini di performance quando si incontra una divergenza (i path di esecuzione non sono allineati).
         
@@ -124,7 +124,7 @@ float *C, int N) {
     	
     	I thread sono suddivisi (logicamente) su due livelli: 
     	\begin{itemize}
-    		\item Block: collezione ordinata di thread, che possono cooperare tra loro, indipendenti l'uno con l'altro, ognuno ha dimensione massima di 1024 thread
+    		\item Block: collezione ordinata di thread, che possono cooperare tra loro, indipendenti l'uno con l'altro; ogni block ha dimensione massima di 1024 thread
     		
     		\item Grid: insieme di tutti i blocchi che eseguono lo stesso kernel
     	\end{itemize}
@@ -137,7 +137,7 @@ float *C, int N) {
     		
     		\item la grid viene mappata al device, il quale può eseguire una o più grid concorrentemente, appartenenti a kernel diversi
     		
-    		\item i thread fisicamente sono raggruppati in gruppi di 32, detti warp; questi dovrebbero, tra loro, avere modello di esecuzione SIMD, pena un degrado delle prestazioni 
+    		\item i thread fisicamente sono raggruppati in gruppi di 32, detti warp; questi dovrebbero, tra loro, avere modello di esecuzione SIMD, pena degrado delle prestazioni 
     	\end{itemize}
         
         I thread possono essere organizzati su blocchi e griglie a 1, 2 o 3 dimensioni. Per lavorare su matrici lo schema più intuitivo è quello di usare blocchi e grid bidimensionali in modo da coprire tutto l'input (grid) dividendolo in sotto-matrici (blocchi).
@@ -200,9 +200,9 @@ float *C, int N) {
     \question Come vengono schedulati i blocchi sugli SM?
     
     \begin{solution}
-        Quando viene invocato un kernel, si ha una coda di blocks che aspettano di andare in esecuzione, il block scheduler assegna ogni blocco al primo SM che abbia risorse a sufficienza libere. Vengono assegnati dinamicamente agli SM in base alla disponibilità. Un blocco di thread viene assegnato a un solo SM e vi rimane fino al termine della sua esecuzione, molteplici blocchi possono risiedere su un singolo SM.
+        Quando viene invocato un kernel, si ha una coda di blocks che aspettano di andare in esecuzione, il block scheduler assegna ogni blocco al primo SM che abbia risorse libere a sufficienza. Vengono assegnati dinamicamente agli SM in base alla disponibilità. Un blocco di thread viene assegnato a un solo SM e vi rimane fino al termine della sua esecuzione; molteplici blocchi possono risiedere su un singolo SM.
         
-        Ogni SM ha un limite di risorse (in termini di registri, shared memory, numero di thread, \dots) e possiede uno o più warp scheduler che si occupano di decidere, ad ogni ciclo di clock, quali warp, tra quelli attivi, mandare in esecuzione; un warp attivo può essere in uno di tre stati: 
+        Ogni SM ha un limite di risorse (in termini di registri, shared memory, numero di thread, \dots) e possiede uno o più warp scheduler che si occupano di decidere, a ogni ciclo di clock, quali warp, tra quelli attivi, mandare in esecuzione; un warp attivo può essere in uno di tre stati: 
         \begin{itemize}
             \item Candidato: pronto per essere mandato in esecuzione
             
@@ -224,12 +224,12 @@ float *C, int N) {
         Permettono la sovrapposizione di trasferimento dati ed esecuzione del kernel.
     \end{solution}
     
-    \question Come può la divergenza causare deadlock?
+    \question Come può la divergenza causare deadlock?\footnote{non sono sicuro, penso non causi deadlock perché tutto lock-step, ma non ho capito e sono stanco}
     
     \begin{solution}
         La divergenza accade quando thread all'interno di uno stesso warp seguono flussi di esecuzione separati. Per risolvere il problema esistono barriere di sincronizzazione a livello di warp come \texttt{\_\_syncwarp(mask)}, queste lasciano i thread che la raggiungono in attesa fino a quando tutti i thread di uno stesso warp non arrivano a quel punto nell'esecuzione.
         
-        Le barriere di sincronizzazione possono causare problemi quando condizionate: se solo una porzione dei thread all'interno di un warp raggiunge il \texttt{\_\_syncwarp()} "nascosto" dietro un \texttt{if} in cui gli altri non entreranno mai, questi rimarranno in un'attesa infinita: deadlock.
+        \st{Le barriere di sincronizzazione possono causare problemi quando condizionate: se solo una porzione dei thread all'interno di un warp raggiunge il \texttt{\_\_syncwarp()} dietro un \texttt{if} in cui gli altri non ci arriveranno mai, lasciando gli altri in attesa infinita: deadlock}.
     \end{solution}
     
 \end{questions}

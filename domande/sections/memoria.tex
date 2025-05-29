@@ -40,7 +40,7 @@
             
             \item Shared Memory: memoria condivisa tra i thread di uno SM, latenza bassa, organizzata in bank: accessi senza conflitti di bank garantiscono throughput massimo. Dimensione comunque limitata e l'uso che ne fa ogni blocco determina il numero di blocchi che possono essere in esecuzione su uno SM concorrentemente
             
-            \item Global Memory: memoria più grande e a più alta latenza ($400 \sim 800$ cicli), accessibile da tutti i thread e dall'host. Permette una buona latenza, ma solo se gli accessi sono coalescenti (raggruppati in transazioni larghe)
+            \item Global Memory: memoria più grande e a più alta latenza ($400 \sim 800$ cicli), accessibile da tutti i thread e dall'host. Permette un buon throughput, ma solo se gli accessi sono coalescenti (raggruppati in transazioni larghe)
             
             \item Local Memory: risiede fisicamente nella global memory, quindi ha la stessa latenza, viene usata per variabili molto grandi o per lo spilling dei registri
             
@@ -96,7 +96,7 @@ kernel<<<grid, block, shared_bytes>>>();
     \begin{solution}
         La global memory è una memoria off-chip (DRAM, divisa dal chip dell'SM su cui il thread è in esecuzione), quindi ad alta latenza ($400\sim 800$ cicli di clock), con scope e lifetime globale. 
         
-        I pattern di accesso alla memoria globale sono le strutture riguardanti "come" viene effettuato l'accesso alla memoria da parte dei thread. La memoria ha, infatti, latenza elevata, ma throughput ampio quando gli accessi sono coalescenti.
+        I pattern di accesso alla memoria globale sono le strutture riguardanti "come" viene effettuato l'accesso alla memoria da parte dei thread. La global memory ha, infatti, latenza elevata, ma throughput ampio quando gli accessi sono coalescenti.
         
         Gli accessi alla memoria del device possono avvenire in transazioni da 32, 64 o 128 byte. Spesso le applicazioni sono limitate dal throughput effettivo della memoria, quindi per rendere efficienti i trasferimenti si vuole minimizzare il numero di transazioni. 
         
@@ -104,7 +104,7 @@ kernel<<<grid, block, shared_bytes>>>();
         
         Gli accessi possono essere:
         \begin{itemize}
-            \item Allineati: quando il primo indirizzo della transazione è un multiplo della granularità della cache usata per servire la transazione (32 byte per L1, 128 per L2)
+            \item Allineati: quando il primo indirizzo della transazione è un multiplo della granularità della memoria usata per servire la transazione (32 byte per L1, 128 per L2)
             
             \item Coalescenti: quando i 32 thread accedono a un blocco contiguo di memoria
         \end{itemize}
@@ -113,7 +113,7 @@ kernel<<<grid, block, shared_bytes>>>();
         
         Può essere importante strutturare i dati in modo da avere accessi coalescenti (array of structures vs structures of array).
         
-        Le operazioni di scrittura non usano la cache L1, le \texttt{store} vengono cachate solo in L2, prima di essere inviati alla device memory in 1,2 o 4 segmenti da 32 byte. Accessi allineati e coalescenti sono ugualmente importanti per lettura e scrittura. Inoltre, per la sola lettura esistono zone di memoria dedicate (constant e texture memory); la lettura possiede una gerarchia di memorie più complessa.
+        Le operazioni di scrittura non usano la cache L1, le \texttt{store} vengono cachate solo in L2, prima di essere inviati alla device memory in 1, 2 o 4 segmenti da 32 byte. Accessi allineati e coalescenti sono ugualmente importanti per lettura e scrittura. Inoltre, per la sola lettura esistono zone di memoria dedicate (constant e texture memory); in generale la lettura possiede una gerarchia di memorie più complessa.
     \end{solution}
     
     \question Bank e bank conflict.
@@ -148,9 +148,9 @@ cudaError_t cudaMemcpyFromSymbol(const void* dst,
     \question Come viene mappata logicamente e fisicamente la shared Memory.
     
     \begin{solution}
-        La shared memory è una memoria programmabile a bassa latenza, con scope di blocco (visibile da tutti thread all'interno di uno stesso blocco) e lifetime pari a quello del kernel. La si può dichiarare tramite il qualificatore \texttt{\_\_shared\_\_}, sia staticamente che dinamicamente. Serve come comunicazione a bassa latenza tra thread dello stesso blocco. La dimensione della shared memory è limitata e il numero di blocchi concorrenti è determinato anche dalla smem disponibile.
+        La shared memory è una memoria programmabile a bassa latenza, con scope di blocco (visibile da tutti thread all'interno di uno stesso blocco) e lifetime pari a quello del kernel. La si può dichiarare tramite il qualificatore \texttt{\_\_shared\_\_}, sia staticamente che dinamicamente (aggiungendo \texttt{extern} e specificando la dimensione in fase di chiamata del kernel). Serve come comunicazione a bassa latenza tra thread dello stesso blocco. La dimensione della shared memory è limitata e il numero di blocchi concorrenti è determinato anche dalla smem disponibile.
         
-        Fisicamente, si tratta di una memoria on-chip, quindi posizionato sullo stesso chip dello SM, organizzata linearmente in moduli chiamati bank (tipicamente 32). Gli accessi alla shared memory (sia load che store) vengono emessi per warp e la banda massima si ha quando tutti gli warp accedono a bank diversi (word consecutive). Se due thread all'interno dello stesso warp tentano di accedere allo stesso bank si ha un bank conflict, che richiede la serializzazione degli accessi e causa un degrado delle prestazioni.
+        Fisicamente, si tratta di una memoria on-chip, quindi posizionato sullo stesso chip dello SM, organizzata linearmente in moduli chiamati bank (tipicamente 32). Gli accessi alla shared memory (sia \texttt{load} che \texttt{store}) vengono emessi per warp e la banda massima si ha quando tutti gli warp accedono a bank diversi (word consecutive). Se due thread all'interno dello stesso warp tentano di accedere allo stesso bank si ha un bank conflict, che richiede la serializzazione degli accessi e causa un degrado delle prestazioni.
     \end{solution}
     
     \question Vantaggi della Unified Memory ed esempio di utilizzo.
@@ -164,7 +164,7 @@ cudaError_t cudaMemcpyFromSymbol(const void* dst,
             
             \item coerenza automatica della memoria, CUDA si occupa di mantenere automaticamente la coerenza tra host e device, a volte a scapito delle performance
             
-            \item over-subscription della memoria, si può allocare più memoria di quanta sia fisicamente disponibile sulla GPU, le pagine verranno spostate in automatico quando necessario, permettendo di usare data set più grandi5
+            \item over-subscription della memoria, si può allocare più memoria di quanta sia fisicamente disponibile sulla GPU, le pagine verranno spostate in automatico quando necessario, permettendo di usare data set più grandi
         \end{itemize} 
         
         Esempio di utilizzo:
