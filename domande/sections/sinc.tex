@@ -73,7 +73,7 @@ cudaError_t cudaStreamWaitEvent(
         Sincronizzazione \textbf{implicita} dovuta a operazioni bloccanti: alcune operazioni causano sincronizzazione in quanto implicano un blocco su tutte le operazioni precedenti sul device corrente. In questo gruppo rientrano molte operazioni relative alla gestione della memoria.
     \end{solution}
     
-    \question Meccanismi di sincronizzazione tra GPU e modalità di trasmissione tra queste \footnote{NB: la parte di multi-GPU non è più trattata}.
+    \question Meccanismi di sincronizzazione tra GPU e modalità di trasmissione tra queste \footnote{Da notare che la parte di multi-GPU non è più trattata nel corso}.
     
     \begin{solution}
         Tra diverse GPU ci sono più metodi di \textbf{sincronizzazione} possibili: 
@@ -97,7 +97,7 @@ cudaError_t cudaStreamWaitEvent(
         \end{itemize}
     \end{solution}
     
-    \question Sincronizzazione tra più device che condividono lo stesso bus.
+    \question Sincronizzazione tra più device che condividono lo stesso bus \footnote{Come sopra}.
     
     \begin{solution}
         La sincronizzazione tramite stream ed eventi si può usare anche tra diversi device: un device può controllare il completamento di un evento appartenente a uno stream in esecuzione su un diverso device. La primitiva

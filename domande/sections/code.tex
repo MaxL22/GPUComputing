@@ -267,6 +267,14 @@ A[base] += B[base + 2];
 A[base] += B[base + 3];
         \end{minted}
         
+        In alternativa, usando le direttive:
+        \begin{minted}{cuda}
+#pragma unroll 4
+for (int i = 0; i < 4; i++){
+    A[base] += B[base + i];
+}
+        \end{minted}
+        
         Lo si dovrebbe usare quando il corpo del ciclo è semplice e il numero di iterazioni è multiplo dell'unroll factor. Un unrolling troppo spinto potrebbe causare bloating del codice e riduzione delle performance dovuta a mancanza di spazio in cache/instruction buffer.
         
         Esempio nella reduction: loop all'interno del kernel, prima dell'unroll
