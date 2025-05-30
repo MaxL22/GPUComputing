@@ -101,6 +101,45 @@ __global__ void conv2D(Matrix A, Matrix B, Matrix M) {
     }
 }
         \end{minted}
+        
+        Codice Numba:
+        \begin{minted}{python}
+@cuda.jit
+def conv2d_numba(A, B, M, A_width, A_height, M_size):
+    # Coordinate globali
+    x = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
+    y = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
+    # Alloca smem 
+    smem = cuda.shared.array(shape=(TILE_SIZE, TILE_SIZE))
+    # Carica in smem
+    for row in range(0, TILE_SIZE, cuda.blockDim.y):
+        for col in range(0, TILE_SIZE, cuda.blockDim.x):
+            # Indici per la smem
+            s_row = thread_y = cuda.threadIdx.y + row
+            s_col = thread_x = cuda.threadIdx.x + col
+            # Indici per i dati originali
+            d_row = y + row - RADIUS
+            d_col = x + col - RADIUS
+            # Bound check
+            if s_row < TILE_SIZE and s_col < TILE_SIZE:
+                if 0 <= d_row < A_height and 0 <= d_col < A_width:
+                    smem[s_row, s_col] = A[d_row, d_col]
+                else:
+                    smem[s_row, s_col] = 0.0
+    cuda.syncthreads()
+    # Se out-of-bounds, non calcolare la somma
+    if x >= A_width or y >= A_height:
+        return
+    # Convoluzione
+    sum_val = 0.0
+    for i in range(M_size):
+        for j in range(M_size):
+            r = cuda.threadIdx.y + i
+            c = cuda.threadIdx.x + j
+            sum_val += smem[r, c] * M[i, j]
+    # Scrive l'output
+    B[y, x] = sum_val
+        \end{minted}
     \end{solution}
     
     \question Pseudocodice del trasferimento in memoria shared per il prodotto matriciale.
@@ -188,7 +227,22 @@ __global__ void upperTriangularMatMul(float *A, float *B,
         C[row * N + col] = sum;
     }
 }
-        \end{minted} 
+        \end{minted}
+        
+        Versione Numba:
+        \begin{minted}{python}
+@cuda.jit
+def upper_triangular_matmul(A, B, C, N):
+    row, col = cuda.grid(2)
+    # Verifica di essere nei limiti
+    if row < N and col < N:
+        tmp = 0.0
+        # Solo se siamo nella parte superiore (inclusa la diagonale)
+        if row <= col:
+            for k in range(row, col + 1):
+                tmp += A[row, k] * B[k, col]
+        C[row, col] = tmp
+        \end{minted}
     \end{solution}
     
     \question Mostrare un uso pratico degli stream CUDA.
@@ -245,6 +299,25 @@ __global__ void streamMQDB(int *A, int *B, int *R) {
     }
     R[tid] = sum;
 }
+        \end{minted}
+        
+        Versione Numba:
+        \begin{minted}{python}
+@cuda.jit
+def stream_mqdb(A, B, R):
+    tid = cuda.threadIdx.x + cuda.threadIdx.y * cuda.blockDim.x
+
+    sA = cuda.shared.array((BS, BS), dtype=numba.int32)
+    sB = cuda.shared.array((BS, BS), dtype=numba.int32)
+
+    sA[cuda.threadIdx.y, cuda.threadIdx.x] = A[tid]
+    sB[cuda.threadIdx.y, cuda.threadIdx.x] = B[tid]
+    cuda.syncthreads()
+
+    tmp = 0
+    for k in range(BS):
+        tmp += sA[k, cuda.threadIdx.y] * sB[cuda.threadIdx.x, k]
+    R[tid] = tmp
         \end{minted}
     \end{solution}
     

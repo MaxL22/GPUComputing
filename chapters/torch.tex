@@ -124,7 +124,7 @@ Esempi:
 
 \subsubsection{Spostare sulla GPU}
 
-Gli attributi di un tensore sono: forma, tipo di dato e \textbf{dispositivo su cui si trova}; quest'ultimo può essere CPU o GPU. Di default, i tensori vengono creati sulla GPU. Se disponibile, vorremmo sfruttare il backend più efficiente dato dalla GPU. Vogliamo spostare sulla GPU i tensori in uso.
+Gli attributi di un tensore sono: forma, tipo di dato e \textbf{dispositivo su cui si trova}; quest'ultimo può essere CPU o GPU. Di default, i tensori vengono creati sulla CPU. Se disponibile, vorremmo sfruttare il backend più efficiente dato dalla GPU. Vogliamo spostare sulla GPU i tensori in uso.
 
 Per vedere se una GPU è disponibile ed eventualmente i parametri della GPU in uso:
 \begin{minted}{python}
@@ -179,12 +179,12 @@ Se i parametri variano troppo in fretta rispetto alla loss function potrebbe ess
 
 Va determinato anche un learning rate $\eta$ che determina di quanto variare i parametri al termine dell'iterazione, sempre secondo la direzione determinata precedentemente.
 
-\href{it.wikipedia.org/wiki/Gradiente}{\texttt{Se vuoi sapere come si calcola il gradiente.}}
+Se vuoi sapere \href{https://it.wikipedia.org/wiki/Gradiente}{\texttt{come si calcola il gradiente}}.
 
-Si vuole calcolare la derivata della loss rispetto a un parametro, per fare ciò applicare la chain rule e calcolare la \textbf{derivata della loss rispetto al suo input moltiplicato la derivata del modello} $m$ (si intende il modello della funzione usata per fare la regressione, in questo caso lineare, quindi $wx + b$) rispetto al parametro
+Si vuole calcolare la derivata della loss rispetto a un parametro, per fare ciò si può applicare la chain rule e calcolare la \textbf{derivata della loss rispetto al suo input moltiplicato la derivata del modello} $m$ (si intende il modello della funzione usata per fare la regressione, in questo caso lineare, quindi $wx + b$) rispetto al parametro
 $$ \nabla_{w,b} = \left( \frac{\partial L}{\partial w}, \frac{\partial L}{\partial b}\right) = \left(\frac{\partial L}{\partial m} \cdot \frac{\partial m}{\partial w}, \frac{\partial L}{\partial m} \cdot \frac{\partial m}{\partial b}\right) $$
 
-Dopo aver inizializzato i parametri, li si aggiorna finché $\bm w$ e $b$ non cambiano più (variazione $\leq \epsilon$), oppure si fissa un numero massimo di iterazioni (ci sono altre termination conditions possibili, ma sticazzi).
+Dopo aver inizializzato i parametri, li si aggiorna finché $\bm w$ e $b$ non cambiano più (variazione $\leq \epsilon$), oppure si fissa un numero massimo di iterazioni (ci sono altre termination conditions possibili).
 
 Se l'aggiornamento dei parametri è troppo grande, si può avere un'oscillazione eccessiva del modello e conseguente divergenza del training.
 

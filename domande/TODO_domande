@@ -2,11 +2,6 @@ Pseudocodice per varie pattern possibili?
     Ad esempio: uso degli stream, uso della smem
 Da fare anche per python, qualche idea base
 
-- MLP in cuda, descrivi un layer a piacere
-
-Domande per sezione, si ringrazia Chad Gepete:
-
-
 6. Numba
 In che modo Numba supporta i streams e il parallelismo dinamico?
 Quali limitazioni ha Numba rispetto alla programmazione CUDA C++?
@@ -26,7 +21,6 @@ In che casi non è consigliato usare Numba GPU?
 Quali best practice seguire per scrivere kernel Numba efficienti?
 
 7. PyTorch
-Come vengono rappresentati i tensori in PyTorch e in che modo supportano la GPU?
 Quali operazioni fondamentali si possono eseguire sui tensori?
 Come si trasferisce un tensore sulla GPU in PyTorch?
 Qual è la differenza tra .to(device) e .cuda()?

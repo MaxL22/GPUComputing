@@ -91,9 +91,9 @@ Tutti i thread in una grid condividono lo stesso spazio di global memory. Una gr
 
 I thread vengono identificati univocamente dalle coordinate: 
 \begin{itemize}
-	\item \texttt{blockId} (indice del blocco nella grid)
+	\item \texttt{blockIdx} (indice del blocco nella grid)
 	
-	\item \texttt{threadId} (indice di thread nel blocco)
+	\item \texttt{threadIdx} (indice di thread nel blocco)
 \end{itemize}
 
 Sono variabili built-in, ognuna delle quali con 3 campi: \texttt{x,y,z} (una per ogni possibile dimensione).
@@ -127,7 +127,7 @@ kernel_name <<<grid, block>>>(argument list);
 	\item \texttt{cudaDeviceSynchronize()} aspetta che la GPU termini l'esecuzione di tutti i task lanciati fino a quel punto, sincronizzazione host device
 \end{itemize}
 
-Per effettuare debugging, la \texttt{Synchronize} permette di "scaricare" tutti i \texttt{printf} quando servono. Altrimenti, dato che le chiamate sono asincrone, si rischia che l'applicazione lato CPU termini prima che i \texttt{printf} abbiano avuto modo di essere mostrati.
+Per effettuare debugging, la \texttt{cudaDeviceSynchronize()} permette di "scaricare" tutti i \texttt{printf} quando servono. Altrimenti, dato che le chiamate sono asincrone, si rischia che l'applicazione lato CPU termini prima che i \texttt{printf} abbiano avuto modo di essere mostrati.
 
 Un altro mezzo di debugging è \texttt{Kernel<<<1,1>>>}: forza l'esecuzione su un solo blocco e thread, emulando comportamento sequenziale sul singolo dato.
 
@@ -193,7 +193,7 @@ Dove si può si deve \textbf{evitare la divergenza di esecuzione} all'interno de
 
 I blocchi di thread possono essere configurati logicamente in 1, 2 o 3 dimensioni, ma a livello hardware sarà una sola dimensione con id progressivo, con un warp ogni 32 thread.
 
-Sarà quindi necessario uno scheduling per i warp (il numero di blocchi richiesto è maggiore, chi va prima in esecuzione?) all'interno dei blocchi, vengono mandati in esecuzione quando sono liberi. Ad ogni colpo di clock lo scheduler dei warp decide quale mandare in esecuzione tra quelli che
+Sarà quindi necessario uno scheduling per i warp (il numero di blocchi richiesto è maggiore, chi va prima in esecuzione?) all'interno dei blocchi, vengono mandati in esecuzione quando sono liberi. A ogni colpo di clock lo scheduler dei warp decide quale mandare in esecuzione tra quelli che
 \begin{itemize}
 	\item non sono in attesa di dati dalla device memory (alta latenza, memory latency)
 	
@@ -213,7 +213,7 @@ Ogni warp ha un contesto di esecuzione (runtime), trasparente al programmatore, 
 	\item Shared memory ripartita tra blocchi
 \end{itemize} 
 
-Di conseguenza, la memoria locale ad ogni thread è limitata, bisogna prestare attenzione alle risorse richieste simultaneamente per ogni thread, altrimenti il numero totale di thread che possono essere attivi concorrentemente si riduce.
+Di conseguenza, la memoria locale a ogni thread è limitata, bisogna prestare attenzione alle risorse richieste simultaneamente per ogni thread, altrimenti il numero totale di thread che possono essere attivi concorrentemente si riduce.
 
 I registri sono usati per le variabili locali automatiche scalari (che non sono array quindi) e le coordinate dei thread. I dati nei registri sono privati ai thread (scope) e ogni multiprocessor ha un insieme di 32-bit register che sono partizionati tra i warp.
 
@@ -235,11 +235,11 @@ Un warp attivo può essere di 3 tipi:
 	\item Candidato: può essere il prossimo ad andare in esecuzione
 \end{itemize}
 
-\paragraph{Warp Divergence:} Tutti i thread all'interno di un warp devono eseguire la stessa istruzione, quindi se sono presenti path diversi  (per esempio per un \texttt{if}) si ha una \textit{divergenza}. 
+\paragraph{Warp Divergence:} Tutti i thread all'interno di un warp devono eseguire la stessa istruzione, quindi se sono presenti path diversi  (per esempio in seguito a un \texttt{if}) si ha una \textit{divergenza}. 
 
 Quando all'interno di un warp è presente divergenza, i molteplici path di esecuzione presenti vanno eseguiti in serie: i path vengono eseguiti uno dopo l'altro, disabilitando i thread non appartenenti a quel flusso di esecuzione.
 
-Questo porta ad un peggioramento delle prestazioni fino a 32 volte. Da notare che questo fenomeno avviene solo all'interno del warp, non vale per thread di warp differenti.
+Questo porta ad un peggioramento delle prestazioni, fino a 32 volte. Da notare che questo fenomeno avviene solo all'interno del warp, non vale per thread di warp differenti.
 
 \paragraph{Latency Hiding:} La "latenza" è il numero di cicli necessari al completamento di un'istruzione. Per massimizzare il throughput occorre che lo scheduler abbia sempre warp eleggibili a ogni ciclo di clock. Si ha così latency hiding scambiando la computazione tra warp.
 
@@ -261,13 +261,13 @@ Si possono avere più livelli di sincronizzazione:
 \begin{itemize}
 	\item \textbf{System-level}: attesa che venga completato un dato task su entrambi host e device
 	\begin{minted}{cuda}
-cudaError_t cudaDeviceSynchronize(void);
+cudaError_t cudaDeviceSynchronize();
 	\end{minted}
 	Blocca l'applicazione host finché tutte le operazioni CUDA non sono completate;
 	
 	\item \textbf{Block-level}: attesa che tutti i thread in un blocco raggiungano lo stesso punto di esecuzione
 	\begin{minted}{cuda}
-__device__ void __syncthreads(void);
+__device__ void __syncthreads();
 	\end{minted}
 	Sincronizza i thread all'interno di un blocco: attende fino a che tutti raggiungono il punto di sincronizzazione
 	
@@ -299,21 +299,32 @@ L'approccio sequenziale è molto semplice, in parallelo un'idea potrebbe essere:
 
 Questo approccio si può implementare in due modi:
 \begin{itemize}
-	\item sommando le coppie di elementi contigui: al passaggio $i$ il thread \texttt{tid} somma valori a distanza $2^i$: \texttt{A[tid] + A[tid + $2^i$]}
+	\item sommando le coppie di elementi contigui: al passaggio $i$ il thread \texttt{tid} somma valori a distanza $2^i$
+    \begin{center}
+        \texttt{A[tid] $\leftarrow$ A[tid] + A[tid + $2^i$]}
+    \end{center}
 	
-	\item sommando coppie di elementi equispaziati (stride): al passaggio $i$ il thread \texttt{tid} somma elementi a distanza \texttt{len(A)/$2^{i+1}$}: \texttt{A[tid] + A[tid + len(A)/$2^{i+1}$]}
+	\item sommando coppie di elementi equispaziati: al passaggio $i$ il thread \texttt{tid} somma elementi a distanza \texttt{len(A)/$2^{i+1}$}
+    \begin{center}
+        \texttt{A[tid] $\leftarrow$ A[tid] + A[tid + len(A)/$2^{i+1}$]}
+    \end{center}
 \end{itemize}
 
 Queste presupponendo che la lunghezza del vettore sia una potenza di 2 e che $i$ parta da 0.
 
-\paragraph{Somma strided:} La strategia parallela è simile alla somma ricorsiva con stride: 
+\paragraph{Somma strided parallela:} Simile alla somma ricorsiva con stride:
 \begin{itemize}
-	\item Ad ogni passo un numero di thread pari alla metà degli elementi effettua le somme parziali (riduzione)
+	\item A ogni passo un numero di thread pari alla metà degli elementi effettua le somme parziali (riduzione)
 	
-	\item Il numero di thread attivi si dimezza ad ogni passo (rinnovare la stride)
+	\item Il numero di thread attivi si dimezza a ogni passo (rinnovare la stride)
 	
 	\item Occorre sincronizzare il comportamento dei thread affinché al passo \texttt{t} abbiano tutti terminato il compito prima di andare al passo \texttt{t+1} (analogo alla chiamata ricorsiva) 
 \end{itemize}
+
+A ogni passo $i$:
+\begin{center}
+    \texttt{if (tid \% $2^{i+1}$ == 0):} \texttt{A[tid] $\leftarrow$ A[tid + $2^i$]}
+\end{center}
 
 Un possibile codice:
 \begin{minted}{cuda}
@@ -323,7 +334,7 @@ for (int stride = 1; stride < blockDim.x; stride *= 2) {
 }
 \end{minted}
 
-Questa soluzione può introdurre divergenza crescente a livello di warp: i thread attivi sono "distanti" a livello di warp, nel primo passo si attivano solo i thread con indici pari, nella seconda iterazione solo la metà pari degli indici precedenti (un quarto dei thread), \dots
+Questa soluzione introduce divergenza crescente a livello di warp: i thread attivi sono "distanti" a livello di warp, nel primo passo si attivano solo i thread con indici pari, nella seconda iterazione solo la metà pari degli indici precedenti (un quarto dei thread), \dots
 
 Vogliamo eliminare la divergenza, fondamentalmente usando thread adiacenti (quindi all'interno dello stesso warp): "convertiamo" gli indici in modo da usare sempre i \texttt{tid} più bassi possibili:
 \begin{minted}{cuda}
@@ -368,18 +379,17 @@ L'idea è molto semplice: si alloca una struttura dati (array lungo \texttt{3 * 
 Esempio per una immagine PPM: 
 \begin{minted}{cuda}
 __global__ void ppm_histGPU(PPM ppm, int *histogram) {
-	uint x = blockIdx.x * blockDim.x + threadIdx.x;
-	
-	if (x >= ppm.width * ppm.height)
-		return;
-	
-	color R = ppm.image[3 * x];
-	color G = ppm.image[3 * x + 1];
-	color B = ppm.image[3 * x + 2];
-	
-	atomicAdd(&histogram[R], 1);
-	atomicAdd(&histogram[G + 256], 1);
-	atomicAdd(&histogram[B + 512], 1);
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    if (x >= ppm.width * ppm.height)
+        return;
+    // Gets the colors
+    color R = ppm.image[3 * x];
+    color G = ppm.image[3 * x + 1];
+    color B = ppm.image[3 * x + 2];
+    // Adds 1 to the counter for each color found
+    atomicAdd(&histogram[R], 1);
+    atomicAdd(&histogram[G + 256], 1);
+    atomicAdd(&histogram[B + 512], 1);
 }
 \end{minted}
 
