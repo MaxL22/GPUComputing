@@ -200,7 +200,7 @@ float *C, int N) {
     \question Come vengono schedulati i blocchi sugli SM?
     
     \begin{solution}
-        Quando viene invocato un kernel, si ha una coda di blocks che aspettano di andare in esecuzione, il block scheduler assegna ogni blocco al primo SM che abbia risorse libere a sufficienza. Vengono assegnati dinamicamente agli SM in base alla disponibilità. Un blocco di thread viene assegnato a un solo SM e vi rimane fino al termine della sua esecuzione; molteplici blocchi possono risiedere su un singolo SM.
+        Quando viene invocato un kernel, si ha una coda di blocks che aspettano di andare in esecuzione, il block scheduler assegna ogni blocco al primo SM che ha risorse libere a sufficienza. Vengono assegnati dinamicamente agli SM in base alla disponibilità. Un blocco di thread viene assegnato a un solo SM e vi rimane fino al termine della sua esecuzione; molteplici blocchi possono risiedere su un singolo SM.
         
         Ogni SM ha un limite di risorse (in termini di registri, shared memory, numero di thread, \dots) e possiede uno o più warp scheduler che si occupano di decidere, a ogni ciclo di clock, quali warp, tra quelli attivi, mandare in esecuzione; un warp attivo può essere in uno di tre stati: 
         \begin{itemize}
