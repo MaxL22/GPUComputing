@@ -455,7 +455,7 @@ Il default stream interviene quando non viene usato esplicitamente uno stream. I
 
 \paragraph{Maintaining Occupancy:} La situazione ideale è avere kernel grandi che occupano completamente il device. Kernel piccoli possono occupare il device in maniera meno organizzata, portando a sequenzializzazione all'interno dello stream.
 
-Dividere su più stream i kernel "piccoli" permette di mantenere l'efficienza togliendo dei vincoli di sequenzialità che porterebbe ad una situazione di bassa occupancy.
+Dividere su più stream i kernel "piccoli" permette di mantenere l'efficienza togliendo dei vincoli di sequenzialità che porterebbero a una situazione di bassa occupancy.
 
 Meglio usare stream (asincroni concorrenti) non default per:
 \begin{itemize}
@@ -670,7 +670,7 @@ cudaError_t cudaStreamWaitEvent(
 \begin{itemize}
 	\item al device
 	
-	\item ad uno stream
+	\item a uno stream
 	
 	\item a un evento all'interno di uno stream
 	
@@ -679,7 +679,7 @@ cudaError_t cudaStreamWaitEvent(
 
 Si può bloccare l'host fino a che il device non ha completato i task precedenti:
 \begin{minted}{cuda}
-cudaError_t cudaDeviceSynchronize(void);
+cudaError_t cudaDeviceSynchronize();
 \end{minted}
 
 Si può bloccare l'host fino a che tutte le operazioni in uno stream sono completate (\texttt{cudaStreamSynchronize()}) oppure eseguire un test non-bloccante (\texttt{cudaStreamQuery()}):

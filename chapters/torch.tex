@@ -19,7 +19,7 @@ I tensori possono essere inizializzati in diversi modi:
 \begin{itemize}
     \item Per creare un \textbf{tensore vuoto}:
     \begin{minted}{python}
-t  = torch.empty(x, y)
+t = torch.empty(x, y)
     \end{minted}
     i parametri sono le dimensioni
     
@@ -241,7 +241,7 @@ Autograd di PyTorch è un componente che automatizza il calcolo della discesa de
 
 Per applicare autograd, è necessario riscrivere modello e loss function usando \texttt{requires\_grad=True} e chiamare \texttt{.backward()} on the loss.
 
-Ogni tensore derivato da uno con \texttt{requires\_grad=True} manterrà uno storico delle sue computazioni. 
+Ogni tensore derivato da uno con \texttt{requires\_grad=True} manterrà uno storico delle sue computazioni. Si può aggiungere il parametro \texttt{requires\_grad=True} alla creazione del tensore.
 
 Dopo aver chiamato \texttt{.backward()}, PyTorch calcola automaticamente il gradiente in \texttt{.grad} (se differenziabile). 
 

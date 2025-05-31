@@ -614,7 +614,7 @@ Meno registri usa il kernel, più blocchi di thread è probabile che risiedano s
 
 \paragraph{Local Memory:} Si tratta di una memoria \textit{lenta} (collocata off-chip, alta latenza, bassa bandwidth). Si tratta di una memoria locale ai thread.
 
-Usata per contenere le variabili automatiche (grandi) non contenute nei registri, o per le variabili al di fuori causa spilling. La local memory risiede nella device memory, pertanto gli accessi hanno stessa latenza e ampiezza di banda della global memory e sono soggetti anche agli stessi vincoli di coalescenza-
+Usata per contenere le variabili automatiche (grandi) non contenute nei registri, o per le variabili al di fuori causa spilling. La local memory risiede nella device memory, pertanto gli accessi hanno stessa latenza e ampiezza di banda della global memory e sono soggetti anche agli stessi vincoli di coalescenza.
 
 Da CC 2.0 ci sono parti poste in cache L1 a livello di SM e in cache L2 a livello di device. Il compilatore \texttt{nvcc} si preoccupa della sua allocazione e non è controllata dal programmatore.
 
@@ -646,14 +646,14 @@ Ottimizzata per la località spaziale 2D, quindi dati espressi sotto forma di ma
 
 Corrisponde alla memoria fisica, con "global" si intende una divisione logica. L'accesso da parte di thread appartenenti a blocchi distinti può potenzialmente portare a modifiche incoerenti. La global memory è accessibile attraverso transazioni da 32, 64, o 128 byte; le transazioni avvengono solo per gruppi di valori, non si può accedere a un valore singolo.
 
-I valori contenuti nella memoria allocata non sono inizializzati, ma si possono inizializzare con dati provenienti dall'host (\texttt{cudaMemcpy}) oppure con un valore specifico
+I valori contenuti nella memoria allocata non sono inizializzati, ma si possono inizializzare con dati provenienti dall'host (\texttt{cudaMemcpy()}) oppure con un valore specifico
 \begin{minted}{cuda}
 cudaError_t cudaMemset(void* devPtr, int value, size_t count)
 \end{minted}
 
 Assegna il valore \texttt{value} a tutti gli indirizzi contenuti nel blocco di memoria.
 
-La memoria allocata è opportunamente allineata per ogni tipo di variabile. La \texttt{cudaMalloc} restituisce \texttt{cudaErrorMemoryAllocation} in caso di fallimento.
+La memoria allocata è opportunamente allineata per ogni tipo di variabile. La \texttt{cudaMalloc()} restituisce \texttt{cudaErrorMemoryAllocation} in caso di fallimento.
 
 Lo \textbf{specificatore \texttt{\_\_device\_\_}} indica una variabile che risiede unicamente sul device. Risiede nella memoria globale (e quindi oggetti distinti per device diversi), ha il lifetime del contesto CUDA in cui è stata creata. Può essere acceduta da tutti i thread e dall'host tramite la libreria runtime:
 \begin{itemize}
@@ -834,5 +834,5 @@ int x = blockIdx.y * blockDim.y + threadIdx.x;
 
 // ...
 // Scrivere sulla matrice output, 
-//		controlli invertiti tra riga e colonna
+//      controlli invertiti tra riga e colonna
 \end{minted}

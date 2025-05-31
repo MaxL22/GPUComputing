@@ -167,7 +167,7 @@ In questo modo la qualità della colorazione risultante dipende dall'ordinamento
 
 Si tratta di un algoritmo approssimato per ambienti distribuiti. Non garantisce una soluzione ottimale, ma la qualità è simile a quella di algoritmi sequenziali greedy.
 
-Dato un grafo $G = (V,E)$, l'idea è:
+Dato un grafo $G = (V,E)$ e un insieme di colori $\mathcal{C}$, l'idea è:
 \begin{itemize}
     \item Ogni vertice $v \in V$ riceve una priorità casuale
     
@@ -201,8 +201,8 @@ Pseudocodice:
                 $S \leftarrow \emptyset$; \\
                 $R \leftarrow V$;  \\
                 \While{$R \neq \emptyset$}{
-                    $\forall v \in R$, $\pi (v) \leftarrow$ rand() \tcp*{parallelo}
-                    \If{$\pi (v)> \pi(n)$, $\forall n \in N(v)$ non colorato}{
+                    $\forall v \in R$, $\pi (v) \leftarrow$ rand() \tcp*{in parallelo}
+                    \If{$\pi (v)> \pi(n)$, $\forall n \in N(v) \cap R$}{
                         $C \leftarrow \bigcup_{n \in N(v)} c(n)$; \\
                         $c(v) \leftarrow$ colore minimo $\notin C$; \\
                         $S \leftarrow S \cup \{v\}$; \\
